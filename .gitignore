@@ -1,0 +1,27 @@
+# Internal project rules — never publish
+CLAUDE.md
+
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# AXL keys (generated, secret)
+axl/keys/
+
+# Build artifacts
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Reference docs (research, not shipped)
+_reference/
