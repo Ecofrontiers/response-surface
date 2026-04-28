@@ -1,0 +1,20 @@
+{
+  "name": "response-surface",
+  "private": true,
+  "workspaces": ["contracts", "agents", "web"],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:*",
+    "dev:web": "cd web && npm run dev",
+    "dev:agents": "cd agents && npm run dev",
+    "build": "npm-run-all build:*",
+    "build:contracts": "cd contracts && npx hardhat compile",
+    "build:web": "cd web && npm run build",
+    "test": "cd contracts && npx hardhat test",
+    "deploy": "cd contracts && npx hardhat run scripts/deploy.ts --network 0g-testnet",
+    "demo": "cd agents && npx tsx scripts/demo-scenario.ts",
+    "demo:rogue": "cd agents && npx tsx scripts/demo-rogue.ts"
+  },
+  "devDependencies": {
+    "npm-run-all2": "^7.0.0"
+  }
+}

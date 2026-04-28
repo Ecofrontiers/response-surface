@@ -1,0 +1,69 @@
+services:
+  axl-fire:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+      - "9002:9002"
+      - "9003:9003"
+      - "9004:9004"
+      - "17000:7000"
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./config-fire.json:/app/config.json:ro
+    command: ["-config", "/app/config.json"]
+
+  axl-water:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9011:9001"
+      - "9012:9012"
+      - "9013:9013"
+      - "9014:9014"
+      - "17010:7010"
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./config-water.json:/app/config.json:ro
+    command: ["-config", "/app/config.json"]
+    depends_on:
+      axl-fire:
+        condition: service_started
+
+  axl-coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9021:9001"
+      - "9022:9022"
+      - "9023:9023"
+      - "9024:9024"
+      - "17020:7020"
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./config-coordinator.json:/app/config.json:ro
+    command: ["-config", "/app/config.json"]
+    depends_on:
+      axl-fire:
+        condition: service_started
+
+  axl-rogue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9031:9001"
+      - "9032:9032"
+      - "9033:9033"
+      - "9034:9034"
+      - "17030:7030"
+    volumes:
+      - ./keys:/app/keys:ro
+      - ./config-rogue.json:/app/config.json:ro
+    command: ["-config", "/app/config.json"]
+    depends_on:
+      axl-fire:
+        condition: service_started

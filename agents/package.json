@@ -1,0 +1,29 @@
+{
+  "name": "@response-surface/agents",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/agent.ts",
+    "dev:rogue": "tsx src/rogue.ts",
+    "demo": "tsx scripts/demo-scenario.ts",
+    "demo:rogue": "tsx scripts/demo-rogue.ts",
+    "setup-ens": "tsx scripts/setup-ens.ts",
+    "register": "tsx scripts/register-agents.ts"
+  },
+  "dependencies": {
+    "@ensdomains/ensjs": "^4.2.2",
+    "@0glabs/0g-serving-broker": "^0.7.5",
+    "@0gfoundation/0g-ts-sdk": "^1.2.6",
+    "@decentralized-geo/astral-sdk": "^0.2.0",
+    "viem": "^2.20.0",
+    "ethers": "6.13.1",
+    "express": "^4.21.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

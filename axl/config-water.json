@@ -1,0 +1,12 @@
+{
+  "PrivateKeyPath": "/app/keys/water.pem",
+  "Listen": ["tls://0.0.0.0:9001"],
+  "Peers": ["tls://axl-fire:9001"],
+  "api_port": 9012,
+  "bridge_addr": "0.0.0.0",
+  "tcp_port": 7000,
+  "router_addr": "http://0.0.0.0",
+  "router_port": 9013,
+  "a2a_addr": "http://0.0.0.0",
+  "a2a_port": 9014
+}

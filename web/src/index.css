@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --accent-fire: #ef4444;
+  --accent-water: #3b82f6;
+  --accent-air: #a855f7;
+  --accent-species: #22c55e;
+  --accent-fund: #f59e0b;
+  --accent-proof: #06b6d4;
+  --surface-allocated: #f59e0b33;
+  --surface-unmet: #ef444433;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.mapboxgl-canvas {
+  outline: none;
+}

@@ -7,8 +7,10 @@ dist/
 .env.local
 .env.*.local
 
-# AXL keys (generated, secret)
+# AXL keys (generated, secret) and build artifacts
 axl/keys/
+axl/axl
+axl/.axl-build/
 
 # Build artifacts
 contracts/artifacts/
