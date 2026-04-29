@@ -88,6 +88,7 @@ export interface AgentMetadata {
   dataSources: string[]
   axlPubkey: string
   role: 'agent' | 'responder' | 'coordinator'
+  zgAddress?: string
 }
 
 export interface CredibilityRecord {

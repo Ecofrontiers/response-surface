@@ -2,6 +2,10 @@ import type { EONETEvent } from '../types'
 
 const EONET_URL = 'https://eonet.gsfc.nasa.gov/api/v3/events'
 
+let cachedEvents: EONETEvent[] = []
+let cacheTime = 0
+const CACHE_TTL = 5 * 60 * 1000
+
 export async function getActiveDisasters(
   category?: string,
   days?: number,
@@ -11,10 +15,20 @@ export async function getActiveDisasters(
   if (days) params.set('days', String(days))
   params.set('status', 'open')
 
-  const res = await fetch(`${EONET_URL}?${params}`)
-  if (!res.ok) throw new Error(`EONET API error: ${res.status}`)
-  const data = await res.json()
-  return data.events
+  try {
+    const res = await fetch(`${EONET_URL}?${params}`)
+    if (!res.ok) throw new Error(`EONET API error: ${res.status}`)
+    const data = await res.json()
+    cachedEvents = data.events
+    cacheTime = Date.now()
+    return data.events
+  } catch (e) {
+    if (cachedEvents.length > 0 && Date.now() - cacheTime < CACHE_TTL) {
+      console.warn(`[eonet] API failed, using cached data (${cachedEvents.length} events, ${Math.round((Date.now() - cacheTime) / 1000)}s old)`)
+      return cachedEvents
+    }
+    throw e
+  }
 }
 
 export async function getDisastersInBBox(

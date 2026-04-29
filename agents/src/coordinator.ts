@@ -54,7 +54,52 @@ async function runCoordinator() {
 
     const assessments: AgentAssessment[] = []
 
-    if (topo) {
+    if (topo && topo.peers.length > 0) {
+      // Phase 0: A2A Discovery — fetch agent cards from all peers
+      console.log(`[coordinator] A2A Discovery: querying ${topo.peers.length} peers...`)
+      const discoveredAgents: { peerId: string; card: any }[] = []
+      for (const peer of topo.peers) {
+        try {
+          const card = await axl.getAgentCard(peer.peerId)
+          discoveredAgents.push({ peerId: peer.peerId, card })
+          console.log(`[coordinator] Discovered: ${card.name} — capabilities: ${card.capabilities.join(', ')}`)
+        } catch (e) {
+          console.warn(`[coordinator] A2A card fetch failed for ${peer.peerId.slice(0, 12)}:`, (e as Error).message)
+        }
+      }
+
+      // Phase 0b: MCP Tasking — request assessments from discovered agents
+      console.log(`[coordinator] MCP Tasking: requesting assessments from ${discoveredAgents.length} agents...`)
+      for (const { peerId, card } of discoveredAgents) {
+        if (card.services?.includes('assessment')) {
+          try {
+            const result = await axl.callMCP(peerId, 'assessment', { type: 'request_assessment', cycleNumber })
+            const assessment = result as unknown as AgentAssessment
+            if (assessment.agentEns && assessment.severity !== undefined) {
+              assessments.push(assessment)
+              console.log(`[coordinator] MCP assessment from ${assessment.agentEns}: severity ${assessment.severity}`)
+            }
+          } catch (e) {
+            console.warn(`[coordinator] MCP assessment call failed for ${card.name}:`, (e as Error).message)
+          }
+        }
+      }
+
+      // Phase 0c: Also drain any queued messages (agents may push assessments)
+      let msg = await axl.recv()
+      while (msg) {
+        try {
+          const assessment = JSON.parse(msg.data.toString()) as AgentAssessment
+          if (!assessments.find(a => a.agentEns === assessment.agentEns)) {
+            assessments.push(assessment)
+            console.log(`[coordinator] Queued assessment from ${assessment.agentEns} (severity: ${assessment.severity})`)
+          }
+        } catch (e) {
+          console.warn('[coordinator] Failed to parse message from', msg.from)
+        }
+        msg = await axl.recv()
+      }
+    } else if (topo) {
       let msg = await axl.recv()
       while (msg) {
         try {
@@ -71,6 +116,16 @@ async function runCoordinator() {
     if (assessments.length === 0) {
       console.log('[coordinator] No assessments received, skipping cycle')
       return
+    }
+
+    // Cross-validation: flag severity outliers
+    if (assessments.length >= 2) {
+      const avgSeverity = assessments.reduce((s, a) => s + a.severity, 0) / assessments.length
+      for (const a of assessments) {
+        if (a.severity > avgSeverity * 2.5) {
+          console.warn(`[coordinator] CROSS-VALIDATION: ${a.agentEns} severity ${a.severity} is ${(a.severity / avgSeverity).toFixed(1)}x average — flagging`)
+        }
+      }
     }
 
     // ENS GATE: Read credibility from ENS text records — mandatory

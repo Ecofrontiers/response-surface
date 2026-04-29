@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/agent.ts",
+    "dev:server": "tsx watch src/mcp-server.ts",
     "dev:rogue": "tsx src/rogue.ts",
     "demo": "tsx scripts/demo-scenario.ts",
     "demo:rogue": "tsx scripts/demo-rogue.ts",
     "setup-ens": "tsx scripts/setup-ens.ts",
-    "register": "tsx scripts/register-agents.ts"
+    "register": "tsx scripts/register-agents.ts",
+    "setup:compute": "tsx scripts/setup-0g-compute.ts"
   },
   "dependencies": {
     "@ensdomains/ensjs": "^4.2.2",

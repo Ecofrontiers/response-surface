@@ -14,6 +14,7 @@ export async function runCoordinatorInference(
   broker: any,
   providerAddress: string,
   assessments: AgentAssessment[],
+  axlPubkeys?: Map<string, string>,
 ): Promise<AllocationPlan> {
   const { endpoint, model } = await broker.inference.getServiceMetadata(providerAddress)
   const headers = await broker.inference.getRequestHeaders(providerAddress)
@@ -39,7 +40,10 @@ Output format:
       model,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: JSON.stringify(assessments) },
+        { role: 'user', content: JSON.stringify({
+          assessments,
+          axlAuthentication: axlPubkeys ? Object.fromEntries(axlPubkeys) : {},
+        }) },
       ],
       response_format: { type: 'json_object' },
     }),

@@ -1,88 +1,111 @@
 # Response Surface
 
-Credibility-weighted disaster response coordination on verifiable infrastructure.
+Disaster response where every decision is verifiable.
 
-## What It Does
+Bioregional AI agents monitor real government data sources, relay assessments through an encrypted P2P mesh, and a coordinator allocates emergency funds weighted by onchain credibility scores. An adversarial agent proves the system works — inflated claims with zero proofs get crushed by the credibility gate.
 
-Bioregional agents monitor government APIs (NASA EONET, FIRMS, USGS, GBIF, AirNow, iNaturalist), assess disaster severity, and relay assessments through an encrypted AXL mesh. A coordinator uses sealed inference (0G Compute TEE) to allocate ResponseFund resources based on credibility-weighted scores. An adversarial agent demonstrates the credibility gate — zero verified proofs means roughly 10% of fund allocation despite inflated severity claims. All agent identities live on ENS (Sepolia) with credibility scores in text records; fund allocations happen on 0G Chain with audit logs on 0G Storage.
+## How It Works
+
+Four agents run an allocation cycle every round:
+
+1. **Detection** — `fire.responsesurface.eth` monitors wildfires in California + Nevada via NASA EONET, FIRMS satellite hotspots, GBIF biodiversity, and EPA AirNow. `water.responsesurface.eth` monitors floods in the Lower Mississippi basin via USGS streamflow gauges, GBIF, and iNaturalist threatened species. `rogue.responsesurface.eth` submits inflated severity with zero verified proofs.
+2. **Mesh** — Assessments relay through a Gensyn AXL P2P mesh with Ed25519 authentication. Each message is signed and verified.
+3. **Identity** — The coordinator reads ENS text records on Sepolia to gate participation. Credibility scores, proof counts, bioregion bounds, and AXL public keys are all stored as ENS text records under `responsesurface.eth`.
+4. **Compute** — Credibility-weighted allocation using the formula `proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)`. With 0G Compute TEE configured, inference runs in a sealed enclave.
+5. **Funds** — fUSD allocations execute on 0G Chain via the ResponseFund contract, weighted by `credibility × severity`.
+6. **Audit** — The full cycle (assessments, scores, allocations) is uploaded as an immutable audit log to 0G Storage with a Merkle root.
+7. **Update** — New credibility scores are written back to ENS text records, feeding the next cycle.
+
+### Adversarial Defense
+
+```
+proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)
+```
+
+Real allocation from a live cycle:
+- `water.responsesurface.eth` — credibility 1000/1000, 6 proofs → **70.5% of fund**
+- `fire.responsesurface.eth` — credibility 820/1000, 4 proofs → **23.1% of fund**
+- `rogue.responsesurface.eth` — credibility 101/1000, 0 proofs → **6.4% of fund** (severity 9, but crushed by credibility gate)
+
+Scores accumulate across rounds via ENS text records. History cannot be faked.
 
 ## Architecture
 
 ```
-[Government APIs] --> [Agent Nodes] --AXL Mesh--> [Coordinator]
-                                                        |
-                                               [0G Compute TEE]
-                                                        |
-                                          [ResponseFund on 0G Chain]
-                                                        |
-                                            [0G Storage Audit Log]
+NASA EONET ─┐                                    ┌─ 0G Chain (fUSD allocation)
+FIRMS       ─┤                                    │
+USGS        ─┼─ Agent Nodes ──AXL Mesh──> Coordinator ──> 0G Storage (audit log)
+GBIF        ─┤      │                        │
+AirNow      ─┤      │                        │
+iNaturalist ─┘  ENS Sepolia ─────────────────┘
+                (identity + credibility)
 ```
 
-- **ENS on Sepolia** — agent identity, 0G addresses, and credibility scores in text records
-- **Astral on Base Sepolia** — location proofs (offchain attestations) for responders
-- **4-node AXL mesh** — encrypted inter-agent message delivery across isolated nodes
-
-## Tracks
-
-| Track | Prize | Our Integration |
+| Layer | Technology | What It Does |
 |---|---|---|
-| 0G Autonomous Agents | $7,500 | Swarm coordination + 0G Compute + Storage + Chain |
-| Gensyn AXL | $5,000 | 4-node encrypted mesh, inter-agent message delivery |
-| ENS Best AI Agent | $2,500 | Identity, credibility text records, allocation gating |
-| ENS Most Creative | $2,500 | ENSIP-25 agent registration + proof-weighted credibility |
+| Identity | ENS on Sepolia | Agent names, credibility scores, proof counts, AXL pubkeys as text records |
+| Communication | Gensyn AXL | Ed25519-authenticated P2P mesh between agent nodes |
+| Data | 6 government APIs | NASA EONET, FIRMS, USGS Water, GBIF, EPA AirNow, iNaturalist |
+| Compute | 0G Compute | Sealed inference in TEE (falls back to local when TEE unavailable) |
+| Funds | 0G Chain | ResponseFund contract holds fUSD, allocates per-cycle |
+| Audit | 0G Storage | Immutable cycle logs with Merkle roots |
+| Location | Astral SDK | Offchain attestations for responder location proofs |
 
 ## Quick Start
 
 ```bash
-git clone <repo>
-cd ethglobal-openagents
-cp .env.example .env        # fill in API keys
+git clone https://github.com/Ecofrontiers/bioregional-agents.git
+cd bioregional-agents
+cp .env.example .env        # fill in API keys (see below)
 npm install
-npm run build:contracts
-npm run deploy
-npm run dev:web             # http://localhost:5173
-npm run dev:agents          # API server on :3001
-cd axl && docker compose up -d   # AXL mesh
-npm run demo                # full demo scenario
-npm run demo:rogue          # adversarial agent demo
+npm run dev:web             # frontend on http://localhost:5174
+npm run dev:agents          # backend API on :3001
 ```
 
-Required env vars: `EVM_PRIVATE_KEY`, `NASA_FIRMS_KEY`, `EPA_AIRNOW_KEY`, `VITE_MAPBOX_TOKEN`, `ASTRAL_COMPUTE_SCHEMA`
+The frontend proxies `/api` to the backend. Click **Run Allocation Cycle** to execute the full pipeline with real API data and onchain transactions.
 
-## Key Addresses
+### Environment Variables
 
-| Contract | Chain | Address |
+| Variable | Required | Source |
 |---|---|---|
-| ENS Registry | Sepolia | `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` |
-| ENS Public Resolver | Sepolia | `0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5` |
-| ERC-8004 Identity | Sepolia | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| FakeUSD (fUSD) | 0G Testnet | `0x6Cf1ed8721aB2B408d2a25797d6F71c9a17923A8` |
-| ResponseFund | 0G Testnet | `0x7e0D9cf6045dd4ba622cd410a9F137a7A6d935a0` |
+| `EVM_PRIVATE_KEY` | Yes | Wallet with Sepolia ETH + 0G testnet tokens |
+| `VITE_MAPBOX_TOKEN` | Yes | [mapbox.com](https://mapbox.com) |
+| `NASA_FIRMS_KEY` | Yes | [firms.modaps.eosdis.nasa.gov](https://firms.modaps.eosdis.nasa.gov/api/area/) |
+| `EPA_AIRNOW_KEY` | Yes | [docs.airnowapi.org](https://docs.airnowapi.org/) |
+| `ZG_COMPUTE_PROVIDER` | No | 0G Compute provider address (enables TEE) |
 
-## Adversarial Defense
+## Verify On-Chain
 
-Credibility scores gate fund allocation using responder location proofs stored as ENS text records:
+Everything is real and verifiable:
 
-```
-proofMultiplier = min(0.15 + proofCount * 0.28, 1.0)
-```
-
-- **Zero proofs** — multiplier 0.15 → rogue agent receives ~10% of fund despite inflated severity claims
-- **3+ proofs** — multiplier 0.99 → honest agents receive ~90% of fund
-- Scores accumulate across rounds via ENS text records; history cannot be faked
+| What | Where |
+|---|---|
+| Agent identities | [fire.responsesurface.eth](https://app.ens.domains/fire.responsesurface.eth) on ENS (Sepolia) |
+| Credibility scores | ENS text record `credibility.score` on each agent subname |
+| ResponseFund contract | [0x7e0D...a0](https://chainscan-galileo.0g.ai/address/0x7e0D9cf6045dd4ba622cd410a9F137a7A6d935a0) on 0G Explorer |
+| fUSD token | [0x6Cf1...A8](https://chainscan-galileo.0g.ai/address/0x6Cf1ed8721aB2B408d2a25797d6F71c9a17923A8) on 0G Explorer |
 
 ## Monorepo Structure
 
 ```
-contracts/   Solidity (0G Chain, evmVersion: cancun, Solidity 0.8.24+)
-agents/      Node.js services + MCP server
-web/         React + Mapbox globe visualization
-axl/         Docker configs for 4-node AXL mesh
+contracts/   Solidity on 0G Chain (evmVersion: cancun, 0.8.24+)
+agents/      Node.js backend — MCP server, coordinator, government API integrations
+web/         React + Mapbox globe with real bioregion boundaries
+axl/         Gensyn AXL node configurations (4 nodes)
 ```
+
+## Tracks
+
+| Track | Prize | Integration |
+|---|---|---|
+| 0G Autonomous Agents | $7,500 | 0G Compute (TEE inference) + Storage (audit Merkle roots) + Chain (fUSD allocation) |
+| Gensyn AXL | $5,000 | 4-node Ed25519 mesh, assessment relay, peer discovery |
+| ENS Best AI Agent | $2,500 | Credibility scores in text records gate fund allocation — remove ENS and the system breaks |
+| ENS Most Creative | $2,500 | ENSIP-25 registration + proof-weighted credibility that accumulates across cycles |
 
 ## Built With
 
-0G Chain / Compute / Storage, Gensyn AXL, ENS (ensjs + ENSIP-25), Astral SDK, NASA EONET / FIRMS / USGS / GBIF / AirNow / iNaturalist, Mapbox, React, Vite, ethers.js, viem
+0G (Chain, Compute, Storage), Gensyn AXL, ENS (ensjs, ENSIP-25), Astral SDK, NASA EONET, NASA FIRMS, USGS Water Services, GBIF, EPA AirNow, iNaturalist, Mapbox GL JS, React, Vite, ethers.js, viem
 
 ## License
 

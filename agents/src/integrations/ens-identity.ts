@@ -48,6 +48,7 @@ export async function createAgentIdentity(
       { key: 'data.sources', value: metadata.dataSources.join(',') },
       { key: 'axl.pubkey', value: metadata.axlPubkey },
       { key: 'role', value: metadata.role },
+      { key: '0g.address', value: metadata.zgAddress || '' },
     ],
   })
 
@@ -91,7 +92,7 @@ export async function getAgentMetadata(
 ): Promise<Record<string, string>> {
   const keys = [
     'description', 'bioregion.bounds', 'data.sources', 'axl.pubkey', 'role',
-    'credibility.score', 'credibility.proofs', 'credibility.lastUpdate',
+    '0g.address', 'credibility.score', 'credibility.proofs', 'credibility.lastUpdate',
   ]
   const results: Record<string, string> = {}
   for (const key of keys) {

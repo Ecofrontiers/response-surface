@@ -1,7 +1,7 @@
 {
   "PrivateKeyPath": "/app/keys/fire.pem",
   "Listen": ["tls://0.0.0.0:9001"],
-  "Peers": [],
+  "Peers": ["tls://axl-water:9001", "tls://axl-coordinator:9001", "tls://axl-rogue:9001"],
   "api_port": 9002,
   "bridge_addr": "0.0.0.0",
   "tcp_port": 7000,

@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react'
 
 type Status = 'green' | 'yellow' | 'red'
 
-export default function Header() {
+interface HeaderProps {
+  onArchitectureClick: () => void
+  onMeshClick: () => void
+  onProofsClick: () => void
+  onENSClick: () => void
+}
+
+export default function Header({
+  onArchitectureClick, onMeshClick, onProofsClick, onENSClick,
+}: HeaderProps) {
   const [zgStatus, setZgStatus] = useState<Status>('yellow')
   const [sepoliaStatus, setSepoliaStatus] = useState<Status>('yellow')
   const [axlStatus, setAxlStatus] = useState<Status>('yellow')
@@ -29,23 +38,34 @@ export default function Header() {
     fetch('/api/axl/status')
       .then(r => r.json())
       .then(data => setAxlStatus(data.status === 'connected' ? 'green' : data.status === 'partial' ? 'yellow' : 'red'))
-      .catch(() => setAxlStatus('red'))
+      .catch(() => setAxlStatus('yellow'))
   }, [])
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-[#0a0e17] to-transparent">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Response Surface
-        </h1>
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
-          LIVE
-        </span>
+    <header className="bg-[#0d1117] border-b border-white/5 px-5 h-11 flex items-center justify-between shrink-0">
+      <div className="flex items-center gap-4">
+        <h1 className="text-sm font-semibold tracking-tight text-white">Response Surface</h1>
+        <div className="flex items-center gap-3 text-[10px] text-gray-500">
+          <StatusDot label="0G Chain" color={zgStatus} />
+          <StatusDot label="ENS Sepolia" color={sepoliaStatus} />
+          <StatusDot label="AXL Mesh" color={axlStatus} />
+        </div>
       </div>
-      <div className="flex items-center gap-4 text-xs text-gray-400">
-        <StatusDot label="0G Chain" color={zgStatus} />
-        <StatusDot label="Sepolia" color={sepoliaStatus} />
-        <StatusDot label="AXL Mesh" color={axlStatus} />
+      <div className="flex items-center gap-1">
+        {[
+          { label: 'Architecture', onClick: onArchitectureClick },
+          { label: 'AXL Mesh', onClick: onMeshClick },
+          { label: 'ENS Registry', onClick: onENSClick },
+          { label: 'Proofs', onClick: onProofsClick },
+        ].map(btn => (
+          <button
+            key={btn.label}
+            onClick={btn.onClick}
+            className="text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer px-2.5 py-1 rounded hover:bg-white/5"
+          >
+            {btn.label}
+          </button>
+        ))}
       </div>
     </header>
   )
@@ -53,13 +73,13 @@ export default function Header() {
 
 function StatusDot({ label, color }: { label: string; color: Status }) {
   const colors = {
-    green: 'bg-green-500',
-    yellow: 'bg-yellow-500',
-    red: 'bg-red-500',
+    green: 'bg-emerald-400',
+    yellow: 'bg-amber-400',
+    red: 'bg-red-400',
   }
   return (
-    <div className="flex items-center gap-1.5">
-      <div className={`w-2 h-2 rounded-full ${colors[color]} ${color === 'green' ? 'animate-pulse' : ''}`} />
+    <div className="flex items-center gap-1">
+      <div className={`w-1.5 h-1.5 rounded-full ${colors[color]} ${color === 'green' ? 'animate-pulse' : ''}`} />
       <span>{label}</span>
     </div>
   )

@@ -63,7 +63,7 @@ export default function AgentPanel({ ensName, agent, textRecords, proofs, onClos
                 />
               </div>
               <span className={`text-xs font-[var(--font-mono)] ${agent.credibilityScore < 300 ? 'text-red-400' : agent.credibilityScore < 600 ? 'text-amber-400' : 'text-cyan-400'}`}>
-                {(agent.credibilityScore / 10).toFixed(1)}%
+                {agent.credibilityScore}/1000
               </span>
             </div>
           </Section>
@@ -96,7 +96,7 @@ export default function AgentPanel({ ensName, agent, textRecords, proofs, onClos
                     </span>
                   </div>
                   <div className="text-gray-500 mt-1">
-                    Score: {(p.credibilityScore / 10).toFixed(1)}%
+                    Score: {p.credibilityScore}/1000
                   </div>
                 </div>
               ))}
