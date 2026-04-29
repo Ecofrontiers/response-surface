@@ -1,28 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1f2937;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --accent-fire: #ef4444;
-  --accent-water: #3b82f6;
-  --accent-air: #a855f7;
-  --accent-species: #22c55e;
-  --accent-fund: #f59e0b;
-  --accent-proof: #06b6d4;
-  --surface-allocated: #f59e0b33;
-  --surface-unmet: #ef444433;
+  /* Astro UXDS — US Space Force ops-center palette */
+  --color-base: #101923;
+  --color-surface: #1b2d3e;
+  --color-header: #172635;
+  --color-hover: #1c3851;
+  --color-selected: #1c3f5e;
+
+  /* Interactive */
+  --color-interactive: #4dacff;
+  --color-interactive-hover: #92cbff;
+  --color-interactive-muted: #2b659b;
+
+  /* Text */
+  --color-text: #ffffff;
+  --color-text-secondary: #d4d8dd;
+  --color-text-placeholder: #a4abb6;
+  --color-text-inverse: #080c11;
+
+  /* Status — 6-level ops-center system */
+  --status-critical: #ff3838;
+  --status-serious: #ffb302;
+  --status-caution: #fce83a;
+  --status-normal: #56f000;
+  --status-standby: #2dccff;
+  --status-off: #a4abb6;
+
+  /* Data viz palette */
+  --viz-1: #4dacff;
+  --viz-2: #00c7cb;
+  --viz-3: #938bdb;
+  --viz-4: #70dde0;
+
+  /* Borders */
+  --border-default: #1c3851;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+
+  /* Functional */
   --font-mono: 'JetBrains Mono', monospace;
+  --radius: 3px;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: var(--color-base);
 }
 
 .mapboxgl-canvas {
   outline: none;
 }
+
+/* Tabular numbers for all data */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Ops-center scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-interactive-muted); }
+
+/* Status dot pulse — critical only */
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--status-normal); }
+  50% { box-shadow: 0 0 6px 2px var(--status-normal); }
+}
+
+.status-glow-normal { animation: status-pulse 2s ease-in-out infinite; }
+
+@keyframes status-pulse-critical {
+  0%, 100% { box-shadow: 0 0 0 0 var(--status-critical); }
+  50% { box-shadow: 0 0 6px 2px var(--status-critical); }
+}
+
+.status-glow-critical { animation: status-pulse-critical 1.5s ease-in-out infinite; }

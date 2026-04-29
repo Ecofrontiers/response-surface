@@ -17,7 +17,7 @@ export async function getObservationsInBBox(
   })
   if (options.threatened) params.set('threatened', 'true')
 
-  const res = await fetch(`${INAT_URL}/observations?${params}`)
+  const res = await fetch(`${INAT_URL}/observations?${params}`, { signal: AbortSignal.timeout(15000) })
   if (!res.ok) throw new Error(`iNaturalist API error: ${res.status}`)
   const data = await res.json()
   return data.results

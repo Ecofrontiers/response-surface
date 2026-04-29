@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import mapboxgl from 'mapbox-gl'
-import type { Agent, Disaster, Allocation, Proof } from '../types'
+import type { Agent, Disaster, Allocation, Proof, CycleMapState } from '../types'
 
 interface GlobeProps {
   agents: Agent[]
@@ -9,14 +9,25 @@ interface GlobeProps {
   proofs: Proof[]
   selectedAgent: string | null
   onAgentClick: (ensName: string) => void
+  cycleMapState: CycleMapState
+}
+
+const AGENT_COLORS: Record<string, string> = {
+  pacific: '#f97316',
+  mountain: '#ef4444',
+  central: '#f59e0b',
+  lakes: '#3b82f6',
+  delta: '#06b6d4',
+  gulf: '#8b5cf6',
+  atlantic: '#10b981',
+  northeast: '#6366f1',
+  coordinator: '#f59e0b',
+  rogue: '#ef4444',
 }
 
 function agentColor(agent: Agent): string {
-  if (agent.role === 'adversary') return '#ef4444'
-  if (agent.dataSources.includes('FIRMS')) return '#f97316'
-  if (agent.dataSources.includes('USGS')) return '#3b82f6'
-  if (agent.role === 'coordinator') return '#f59e0b'
-  return '#6b7280'
+  const name = agent.ensName.split('.')[0]
+  return AGENT_COLORS[name] || (agent.role === 'coordinator' ? '#f59e0b' : '#6b7280')
 }
 
 function credibilityColor(score: number | undefined): string {
@@ -38,65 +49,51 @@ function createArc(start: [number, number], end: [number, number], steps = 40): 
   return points
 }
 
-// Real geographic boundaries for monitoring regions
-// These trace actual coastlines and state borders (simplified for rendering)
 const BIOREGION_POLYGONS: Record<string, [number, number][]> = {
-  'fire.responsesurface.eth': [
-    // California + Nevada — Pacific coast south, AZ/MX border east, OR border north
-    [-124.4, 42.0],
-    [-124.3, 40.8],
-    [-124.0, 40.4],
-    [-123.7, 39.4],
-    [-123.0, 38.3],
-    [-122.5, 37.8],
-    [-122.1, 36.8],
-    [-121.5, 36.1],
-    [-120.6, 35.2],
-    [-120.1, 34.7],
-    [-119.4, 34.3],
-    [-118.5, 34.0],
-    [-117.9, 33.5],
-    [-117.3, 33.0],
-    [-117.0, 32.5],
-    [-114.7, 32.7],
-    [-114.6, 35.0],
-    [-114.1, 36.2],
-    [-114.1, 42.0],
-    [-124.4, 42.0],
+  'pacific.responsesurface.eth': [
+    [-124.8, 49.0], [-124.5, 46.0], [-124.0, 42.0], [-123.7, 39.4],
+    [-122.5, 37.8], [-121.5, 36.1], [-120.1, 34.7], [-118.5, 34.0],
+    [-117.3, 33.0], [-117.0, 32.5], [-114.0, 32.5], [-114.0, 37.0],
+    [-114.0, 49.0], [-124.8, 49.0],
   ],
-  'water.responsesurface.eth': [
-    // Lower Mississippi basin — LA, MS, AR state boundaries approximated
-    [-94.6, 36.5],
-    [-92.0, 36.5],
-    [-90.2, 36.5],
-    [-89.5, 35.8],
-    [-88.8, 34.5],
-    [-88.1, 33.0],
-    [-88.4, 31.0],
-    [-88.9, 30.2],
-    [-89.6, 29.2],
-    [-90.5, 29.0],
-    [-91.8, 29.4],
-    [-93.0, 29.6],
-    [-93.8, 29.8],
-    [-94.0, 30.5],
-    [-94.0, 33.0],
-    [-94.5, 34.0],
-    [-94.6, 36.5],
+  'mountain.responsesurface.eth': [
+    [-117.0, 49.0], [-117.0, 37.0], [-114.0, 37.0], [-104.0, 37.0],
+    [-104.0, 49.0], [-117.0, 49.0],
+  ],
+  'central.responsesurface.eth': [
+    [-104.0, 49.0], [-104.0, 37.0], [-90.0, 37.0],
+    [-90.0, 49.0], [-104.0, 49.0],
+  ],
+  'lakes.responsesurface.eth': [
+    [-92.0, 49.0], [-92.0, 38.0], [-80.5, 38.0],
+    [-80.5, 49.0], [-92.0, 49.0],
+  ],
+  'delta.responsesurface.eth': [
+    [-95.0, 37.0], [-95.0, 29.0], [-91.0, 29.0], [-89.5, 29.2],
+    [-88.5, 30.5], [-85.0, 30.0], [-85.0, 37.0], [-95.0, 37.0],
+  ],
+  'gulf.responsesurface.eth': [
+    [-107.0, 37.0], [-107.0, 29.0], [-103.0, 29.0], [-99.0, 26.0],
+    [-97.0, 25.5], [-93.0, 29.0], [-93.0, 37.0], [-107.0, 37.0],
+  ],
+  'atlantic.responsesurface.eth': [
+    [-85.0, 37.0], [-85.0, 30.0], [-82.0, 27.5], [-80.0, 24.5],
+    [-75.0, 30.0], [-75.0, 37.0], [-85.0, 37.0],
+  ],
+  'northeast.responsesurface.eth': [
+    [-80.5, 47.5], [-80.5, 38.0], [-75.0, 38.0], [-70.0, 40.5],
+    [-67.0, 44.5], [-67.0, 47.5], [-80.5, 47.5],
   ],
 }
 
 function agentIconSvg(name: string, color: string, s = 20): string {
-  if (name === 'fire') {
-    return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><path d="M10 2C10 2 5 8 5 12C5 15.3 7.2 18 10 18C12.8 18 15 15.3 15 12C15 8 10 2 10 2Z" fill="${color}" stroke="white" stroke-width="1.2"/></svg>`
-  }
-  if (name === 'water') {
-    return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><path d="M10 2C10 2 4 9 4 13C4 16 6.7 18 10 18C13.3 18 16 16 16 13C16 9 10 2 10 2Z" fill="${color}" stroke="white" stroke-width="1.2"/></svg>`
-  }
   if (name === 'coordinator') {
     return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><polygon points="10,1 12.2,7.2 19,7.6 13.8,11.8 15.4,18.5 10,14.8 4.6,18.5 6.2,11.8 1,7.6 7.8,7.2" fill="${color}" stroke="white" stroke-width="0.8"/></svg>`
   }
-  return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><path d="M10 2L18 17H2L10 2Z" fill="${color}" stroke="white" stroke-width="1.2"/><text x="10" y="14" text-anchor="middle" fill="white" font-size="9" font-weight="bold">!</text></svg>`
+  if (name === 'rogue') {
+    return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><path d="M10 2L18 17H2L10 2Z" fill="${color}" stroke="white" stroke-width="1.2"/><text x="10" y="14" text-anchor="middle" fill="white" font-size="9" font-weight="bold">!</text></svg>`
+  }
+  return `<svg width="${s}" height="${s}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="${color}" stroke="white" stroke-width="1.2"/><text x="10" y="14" text-anchor="middle" fill="white" font-size="8" font-weight="bold">${name[0].toUpperCase()}</text></svg>`
 }
 
 function createDisasterIcon(color: string, shape: 'triangle' | 'diamond' | 'circle', size = 32): { width: number; height: number; data: Uint8ClampedArray } {
@@ -137,13 +134,27 @@ function createDisasterIcon(color: string, shape: 'triangle' | 'diamond' | 'circ
   return { width: size, height: size, data: imgData.data }
 }
 
-export default function Globe({ agents, disasters, allocations, proofs, onAgentClick }: GlobeProps) {
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+export default function Globe({ agents, disasters, allocations, proofs, onAgentClick, cycleMapState }: GlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const animFrameRef = useRef<number>(0)
   const prevAllocCountRef = useRef(0)
   const [isLoaded, setIsLoaded] = useState(false)
+
+  // Refs for animation loop access
+  const frameRef = useRef(0)
+  const cycleStateRef = useRef<CycleMapState>({ phase: 'idle', allocationShares: {} })
+  const agentsRef = useRef<Agent[]>([])
+  const disastersRef = useRef<Disaster[]>([])
+  const meshFlowRef = useRef(0)
+  const phaseStartRef = useRef(0)
+  const prevPhaseRef = useRef('idle')
+
+  useEffect(() => { agentsRef.current = agents }, [agents])
+  useEffect(() => { disastersRef.current = disasters }, [disasters])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -171,7 +182,6 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     })
 
     map.on('load', () => {
-      // Load disaster icon images (canvas-rendered)
       map.addImage('icon-wildfire', createDisasterIcon('#ef4444', 'triangle'), { pixelRatio: 2 })
       map.addImage('icon-flood', createDisasterIcon('#3b82f6', 'diamond'), { pixelRatio: 2 })
       map.addImage('icon-storm', createDisasterIcon('#a855f7', 'diamond'), { pixelRatio: 2 })
@@ -179,43 +189,27 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       map.addImage('icon-volcano', createDisasterIcon('#f97316', 'triangle'), { pixelRatio: 2 })
       map.addImage('icon-default', createDisasterIcon('#f59e0b', 'circle'), { pixelRatio: 2 })
 
-      // === SOURCES ===
-      map.addSource('bioregions', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
+      // === BASE SOURCES ===
+      map.addSource('bioregions', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('disasters', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('axl-arcs', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('proofs', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('allocation-pulses', { type: 'geojson', data: EMPTY_FC })
 
-      map.addSource('disasters', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
+      // === CYCLE ANIMATION SOURCES ===
+      map.addSource('bioregion-active', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('disaster-highlight', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('mesh-flow', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('tee-glow', { type: 'geojson', data: EMPTY_FC })
+      map.addSource('fund-flow', { type: 'geojson', data: EMPTY_FC })
 
-      map.addSource('axl-arcs', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
+      // === BASE LAYERS ===
 
-      map.addSource('proofs', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-
-      map.addSource('allocation-pulses', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-
-      // === LAYERS (bottom to top) ===
-
-      // Bioregion boundaries — real geographic polygons
       map.addLayer({
         id: 'bioregion-fill',
         type: 'fill',
         source: 'bioregions',
-        paint: {
-          'fill-color': ['get', 'color'],
-          'fill-opacity': 0.06,
-        },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.06 },
       })
 
       map.addLayer({
@@ -230,17 +224,65 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         },
       })
 
+      // Active bioregion overlay (cycle animation)
+      map.addLayer({
+        id: 'bioregion-active-fill',
+        type: 'fill',
+        source: 'bioregion-active',
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0 },
+      })
+
+      map.addLayer({
+        id: 'bioregion-active-border',
+        type: 'line',
+        source: 'bioregion-active',
+        paint: { 'line-color': ['get', 'color'], 'line-width': 2.5, 'line-opacity': 0 },
+      })
+
+      // Disaster highlight rings (cycle animation)
+      map.addLayer({
+        id: 'disaster-highlight-ring',
+        type: 'circle',
+        source: 'disaster-highlight',
+        paint: {
+          'circle-radius': 22,
+          'circle-color': 'transparent',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': ['get', 'color'],
+          'circle-stroke-opacity': 0,
+        },
+      })
+
+      // Fund flow lines (cycle animation — behind arcs)
+      map.addLayer({
+        id: 'fund-flow-glow',
+        type: 'line',
+        source: 'fund-flow',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 8,
+          'line-opacity': 0,
+          'line-blur': 8,
+        },
+      })
+
+      map.addLayer({
+        id: 'fund-flow-line',
+        type: 'line',
+        source: 'fund-flow',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': ['get', 'width'],
+          'line-opacity': 0,
+        },
+      })
+
       // AXL mesh arcs
       map.addLayer({
         id: 'axl-arcs-glow',
         type: 'line',
         source: 'axl-arcs',
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': 6,
-          'line-opacity': 0.15,
-          'line-blur': 6,
-        },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 6, 'line-opacity': 0, 'line-blur': 6 },
       })
 
       map.addLayer({
@@ -250,64 +292,81 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         paint: {
           'line-color': ['get', 'color'],
           'line-width': 1.5,
-          'line-opacity': 0.6,
+          'line-opacity': 0,
           'line-dasharray': [2, 3],
         },
       })
 
-      // Disaster pulse ring (animated, behind icons)
+      // Mesh flow dots (cycle animation)
+      map.addLayer({
+        id: 'mesh-flow-dots',
+        type: 'circle',
+        source: 'mesh-flow',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': ['get', 'color'],
+          'circle-blur': 0.3,
+          'circle-opacity': 0,
+        },
+      })
+
+      // TEE coordinator glow (cycle animation)
+      map.addLayer({
+        id: 'tee-glow-ring',
+        type: 'circle',
+        source: 'tee-glow',
+        paint: {
+          'circle-radius': 30,
+          'circle-color': 'transparent',
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#f59e0b',
+          'circle-stroke-opacity': 0,
+        },
+      })
+
+      map.addLayer({
+        id: 'tee-glow-inner',
+        type: 'circle',
+        source: 'tee-glow',
+        paint: {
+          'circle-radius': 18,
+          'circle-color': '#f59e0b',
+          'circle-opacity': 0,
+          'circle-blur': 1,
+        },
+      })
+
+      // Disaster pulse ring
       map.addLayer({
         id: 'disaster-pulse',
         type: 'circle',
         source: 'disasters',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['get', 'severity'],
-            1, 12,
-            5, 22,
-            10, 35,
-          ],
+          'circle-radius': ['interpolate', ['linear'], ['get', 'severity'], 1, 12, 5, 22, 10, 35],
           'circle-color': 'transparent',
-          'circle-stroke-width': ['interpolate', ['linear'], ['get', 'severity'],
-            1, 1,
-            5, 1.5,
-            10, 2.5,
-          ],
+          'circle-stroke-width': ['interpolate', ['linear'], ['get', 'severity'], 1, 1, 5, 1.5, 10, 2.5],
           'circle-stroke-color': ['match', ['get', 'category'],
-            'wildfires', '#ef4444',
-            'floods', '#3b82f6',
-            'severeStorms', '#a855f7',
-            'seaLakeIce', '#06b6d4',
-            'volcanoes', '#f97316',
-            '#f59e0b',
+            'wildfires', '#ef4444', 'floods', '#3b82f6', 'severeStorms', '#a855f7',
+            'seaLakeIce', '#06b6d4', 'volcanoes', '#f97316', '#f59e0b',
           ],
           'circle-stroke-opacity': 0.4,
         },
       })
 
-      // Disaster icon markers (symbol layer — triangles, diamonds, circles by category)
       map.addLayer({
         id: 'disaster-icons',
         type: 'symbol',
         source: 'disasters',
         layout: {
           'icon-image': ['match', ['get', 'category'],
-            'wildfires', 'icon-wildfire',
-            'floods', 'icon-flood',
-            'severeStorms', 'icon-storm',
-            'seaLakeIce', 'icon-ice',
-            'volcanoes', 'icon-volcano',
-            'icon-default',
+            'wildfires', 'icon-wildfire', 'floods', 'icon-flood', 'severeStorms', 'icon-storm',
+            'seaLakeIce', 'icon-ice', 'volcanoes', 'icon-volcano', 'icon-default',
           ],
-          'icon-size': ['interpolate', ['linear'], ['get', 'severity'],
-            1, 0.8,
-            5, 1.2,
-            10, 1.8,
-          ],
+          'icon-size': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.8, 5, 1.2, 10, 1.8],
           'icon-allow-overlap': true,
         },
       })
 
-      // Proof markers
       map.addLayer({
         id: 'proof-markers',
         type: 'circle',
@@ -320,7 +379,6 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         },
       })
 
-      // Allocation pulse ring
       map.addLayer({
         id: 'allocation-pulse-ring',
         type: 'circle',
@@ -354,10 +412,13 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       map.on('mouseenter', 'disaster-icons', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'disaster-icons', () => { map.getCanvas().style.cursor = '' })
 
-      // === ANIMATION ===
-      let frame = 0
+      // === ANIMATION LOOP ===
       const animate = () => {
-        frame++
+        const frame = ++frameRef.current
+        const cs = cycleStateRef.current
+        const phase = cs.phase
+
+        // --- Base animations (always running) ---
         if (map.getLayer('disaster-pulse')) {
           const t = frame * 0.03
           map.setPaintProperty('disaster-pulse', 'circle-radius', [
@@ -366,14 +427,129 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
             5, 22 + Math.sin(t) * 6,
             10, 35 + Math.sin(t * 2) * 10,
           ])
-          map.setPaintProperty('disaster-pulse', 'circle-stroke-opacity',
-            0.15 + Math.abs(Math.sin(t)) * 0.35,
-          )
+          map.setPaintProperty('disaster-pulse', 'circle-stroke-opacity', 0.15 + Math.abs(Math.sin(t)) * 0.35)
         }
-        if (map.getLayer('axl-arcs-line')) {
+
+        if (map.getLayer('axl-arcs-line') && phase === 'axl') {
           const dashPhase = (frame * 0.08) % 5
           map.setPaintProperty('axl-arcs-line', 'line-dasharray', [2, 3 + Math.sin(dashPhase) * 0.5])
         }
+
+        // --- Cycle phase animations ---
+        const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
+
+        // COLLECT: bioregion pulse + disaster highlight
+        if (phase === 'collecting') {
+          const elapsed = frame - phaseStartRef.current
+          const t = (elapsed % 90) / 90
+          const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2
+          const opacity = 0.04 + pulse * 0.18
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', opacity)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', clamp01(opacity * 3.5))
+          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', clamp01(opacity * 3))
+          const hr = 16 + Math.sin(t * Math.PI * 2) * 6
+          map.setPaintProperty('disaster-highlight-ring', 'circle-radius', Math.max(10, hr))
+        }
+
+        // AXL: flow dots along arcs + brighten arcs
+        if (phase === 'axl') {
+          meshFlowRef.current = (meshFlowRef.current + 0.018) % 1
+          const coord = agentsRef.current.find(a => a.role === 'coordinator')
+          if (coord) {
+            const dots: GeoJSON.Feature[] = []
+            agentsRef.current.filter(a => a.role !== 'coordinator').forEach(a => {
+              const arcPts = createArc(a.bioregion.center, coord.bioregion.center)
+              for (let d = 0; d < 3; d++) {
+                const p = (meshFlowRef.current + d / 3) % 1
+                const idx = Math.min(Math.floor(p * arcPts.length), arcPts.length - 1)
+                dots.push({
+                  type: 'Feature',
+                  properties: { color: a.role === 'adversary' ? '#ef4444' : '#a78bfa' },
+                  geometry: { type: 'Point', coordinates: arcPts[idx] },
+                })
+              }
+            })
+            const src = map.getSource('mesh-flow') as mapboxgl.GeoJSONSource
+            if (src) src.setData({ type: 'FeatureCollection', features: dots })
+          }
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0.9)
+          map.setPaintProperty('axl-arcs-line', 'line-opacity', 0.9)
+          map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0.4)
+          // Fade out bioregion from collecting phase
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', 0)
+          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', 0)
+        }
+
+        // ENS GATE: brief verification sweep (reuse disaster highlight as a "scan" ring)
+        if (phase === 'ens_gate') {
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0)
+          map.setPaintProperty('axl-arcs-line', 'line-opacity', 0)
+          map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0)
+        }
+
+        // CREDIBILITY: keep clean
+        if (phase === 'credibility') {
+          // Agent rings update via React state; map just stays calm
+        }
+
+        // TEE: coordinator glow
+        if (phase === 'tee') {
+          const t = frame * 0.06
+          const pulse = (Math.sin(t) + 1) / 2
+          const glowOp = 0.1 + pulse * 0.3
+          const ringR = 28 + Math.sin(t * 0.7) * 12
+          map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', clamp01(glowOp))
+          map.setPaintProperty('tee-glow-ring', 'circle-radius', Math.max(16, ringR))
+          map.setPaintProperty('tee-glow-inner', 'circle-opacity', clamp01(glowOp * 0.5))
+        }
+
+        // ALLOCATING: fund flow lines pulse
+        if (phase === 'allocating') {
+          const t = frame * 0.04
+          const pulse = (Math.sin(t) + 1) / 2
+          const lineOp = 0.15 + pulse * 0.45
+          map.setPaintProperty('fund-flow-line', 'line-opacity', clamp01(lineOp))
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(lineOp * 0.3))
+          // Fade TEE glow
+          map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', 0)
+          map.setPaintProperty('tee-glow-inner', 'circle-opacity', 0)
+        }
+
+        // STORAGE / ENS_WRITE: keep fund flow visible but static
+        if (phase === 'storage' || phase === 'ens_write') {
+          map.setPaintProperty('fund-flow-line', 'line-opacity', 0.3)
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', 0.1)
+        }
+
+        // COMPLETE: flash all bioregions then fade
+        if (phase === 'complete') {
+          const elapsed = frame - phaseStartRef.current
+          const t = Math.min(elapsed / 120, 1)
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
+          map.setPaintProperty('fund-flow-line', 'line-opacity', clamp01(0.3 * (1 - t)))
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(0.1 * (1 - t)))
+          map.setPaintProperty('bioregion-fill', 'fill-opacity', clamp01(0.06 + 0.2 * (1 - t)))
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0)
+          map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', 0)
+          map.setPaintProperty('tee-glow-inner', 'circle-opacity', 0)
+        }
+
+        // IDLE: everything off
+        if (phase === 'idle') {
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', 0)
+          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', 0)
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0)
+          map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', 0)
+          map.setPaintProperty('tee-glow-inner', 'circle-opacity', 0)
+          map.setPaintProperty('fund-flow-line', 'line-opacity', 0)
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', 0)
+          map.setPaintProperty('bioregion-fill', 'fill-opacity', 0.06)
+          map.setPaintProperty('axl-arcs-line', 'line-opacity', 0)
+          map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0)
+        }
+
         animFrameRef.current = requestAnimationFrame(animate)
       }
       animFrameRef.current = requestAnimationFrame(animate)
@@ -412,6 +588,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       el.style.width = `${ringSize}px`
       el.style.height = `${ringSize}px`
       el.style.cursor = 'pointer'
+      el.style.transition = 'transform 0.5s ease'
 
       const ring = document.createElement('div')
       ring.style.position = 'absolute'
@@ -419,6 +596,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       ring.style.borderRadius = '50%'
       ring.style.border = `${1 + Math.round(credPct * 2.5)}px solid ${credColor}`
       ring.style.opacity = String(0.3 + credPct * 0.5)
+      ring.style.transition = 'border-width 1s ease, border-color 1s ease, opacity 1s ease'
       el.appendChild(ring)
 
       const iconWrapper = document.createElement('div')
@@ -469,53 +647,39 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       markersRef.current.push(marker)
     })
 
-    // Bioregion polygon fills — real geographic shapes
+    // Bioregion polygon fills
     const bioregionFeatures = agents
       .filter(a => BIOREGION_POLYGONS[a.ensName])
       .map(a => ({
         type: 'Feature' as const,
         properties: { color: agentColor(a), name: a.ensName },
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [BIOREGION_POLYGONS[a.ensName]],
-        },
+        geometry: { type: 'Polygon' as const, coordinates: [BIOREGION_POLYGONS[a.ensName]] },
       }))
 
     const bioSrc = map.getSource('bioregions') as mapboxgl.GeoJSONSource
-    if (bioSrc) {
-      bioSrc.setData({ type: 'FeatureCollection', features: bioregionFeatures })
-    }
+    if (bioSrc) bioSrc.setData({ type: 'FeatureCollection', features: bioregionFeatures })
 
-    // AXL arcs from agents to coordinator
+    // AXL arcs
     const coordinator = agents.find(a => a.role === 'coordinator')
     if (coordinator) {
       const arcFeatures = agents
         .filter(a => a.role !== 'coordinator')
         .map(a => ({
           type: 'Feature' as const,
-          properties: {
-            color: a.role === 'adversary' ? '#ef4444' : '#8b5cf6',
-            from: a.ensName,
-          },
-          geometry: {
-            type: 'LineString' as const,
-            coordinates: createArc(a.bioregion.center, coordinator.bioregion.center),
-          },
+          properties: { color: a.role === 'adversary' ? '#ef4444' : '#8b5cf6', from: a.ensName },
+          geometry: { type: 'LineString' as const, coordinates: createArc(a.bioregion.center, coordinator.bioregion.center) },
         }))
 
       const arcSrc = map.getSource('axl-arcs') as mapboxgl.GeoJSONSource
-      if (arcSrc) {
-        arcSrc.setData({ type: 'FeatureCollection', features: arcFeatures })
-      }
+      if (arcSrc) arcSrc.setData({ type: 'FeatureCollection', features: arcFeatures })
     }
   }, [isLoaded, agents, onAgentClick])
 
-  // Disaster data — live from NASA EONET
+  // Disaster data
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('disasters') as mapboxgl.GeoJSONSource
     if (!src) return
-
     src.setData({
       type: 'FeatureCollection',
       features: disasters.map(d => ({
@@ -526,11 +690,11 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     })
   }, [isLoaded, disasters])
 
+  // Proof markers
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('proofs') as mapboxgl.GeoJSONSource
     if (!src) return
-
     src.setData({
       type: 'FeatureCollection',
       features: proofs.map(p => ({
@@ -541,7 +705,125 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     })
   }, [isLoaded, proofs])
 
-  // Allocation pulse animation
+  // === CYCLE MAP STATE REACTOR ===
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current) return
+    const map = mapRef.current
+    const { phase, activeAgent, allocationShares } = cycleMapState
+
+    // Track phase transitions
+    if (phase !== prevPhaseRef.current) {
+      phaseStartRef.current = frameRef.current
+      prevPhaseRef.current = phase
+      meshFlowRef.current = 0
+    }
+
+    cycleStateRef.current = cycleMapState
+
+    // COLLECTING: highlight active agent's bioregion + disasters
+    if (phase === 'collecting' && activeAgent) {
+      const polygon = BIOREGION_POLYGONS[activeAgent]
+      const agent = agents.find(a => a.ensName === activeAgent)
+      if (polygon && agent) {
+        const src = map.getSource('bioregion-active') as mapboxgl.GeoJSONSource
+        if (src) {
+          src.setData({
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              properties: { color: agentColor(agent) },
+              geometry: { type: 'Polygon', coordinates: [polygon] },
+            }],
+          })
+        }
+
+        // Find disasters within this bioregion
+        const bbox = agent.bioregion.bbox
+        const nearbyDisasters = disasters.filter(d => {
+          if (d.geometry.type !== 'Point') return false
+          const [lng, lat] = (d.geometry as GeoJSON.Point).coordinates
+          return lng >= bbox.west && lng <= bbox.east && lat >= bbox.south && lat <= bbox.north
+        })
+
+        const dSrc = map.getSource('disaster-highlight') as mapboxgl.GeoJSONSource
+        if (dSrc) {
+          dSrc.setData({
+            type: 'FeatureCollection',
+            features: nearbyDisasters.map(d => ({
+              type: 'Feature',
+              properties: { color: agentColor(agent) },
+              geometry: d.geometry,
+            })),
+          })
+        }
+      } else {
+        // Agent without bioregion polygon (rogue) — clear highlight
+        const src = map.getSource('bioregion-active') as mapboxgl.GeoJSONSource
+        if (src) src.setData(EMPTY_FC)
+        const dSrc = map.getSource('disaster-highlight') as mapboxgl.GeoJSONSource
+        if (dSrc) dSrc.setData(EMPTY_FC)
+      }
+    }
+
+    // TEE: place glow on coordinator
+    if (phase === 'tee') {
+      const coord = agents.find(a => a.role === 'coordinator')
+      if (coord) {
+        const src = map.getSource('tee-glow') as mapboxgl.GeoJSONSource
+        if (src) {
+          src.setData({
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: coord.bioregion.center },
+            }],
+          })
+        }
+      }
+    }
+
+    // ALLOCATING: draw fund flow lines from coordinator to each agent
+    if (phase === 'allocating' && Object.keys(allocationShares).length > 0) {
+      const coord = agents.find(a => a.role === 'coordinator')
+      if (coord) {
+        const features = Object.entries(allocationShares)
+          .map(([ensName, share]) => {
+            const agent = agents.find(a => a.ensName === ensName)
+            if (!agent) return null
+            return {
+              type: 'Feature' as const,
+              properties: {
+                color: agentColor(agent),
+                width: 1 + share * 6,
+              },
+              geometry: {
+                type: 'LineString' as const,
+                coordinates: createArc(coord.bioregion.center, agent.bioregion.center),
+              },
+            }
+          })
+          .filter(Boolean)
+
+        const src = map.getSource('fund-flow') as mapboxgl.GeoJSONSource
+        if (src) src.setData({ type: 'FeatureCollection', features: features as any })
+      }
+
+      // Trigger proportional allocation pulse
+      triggerAllocationPulse()
+    }
+
+    // IDLE / COMPLETE: clear all animation sources
+    if (phase === 'idle') {
+      const sources = ['bioregion-active', 'disaster-highlight', 'mesh-flow', 'tee-glow', 'fund-flow']
+      sources.forEach(s => {
+        const src = map.getSource(s) as mapboxgl.GeoJSONSource
+        if (src) src.setData(EMPTY_FC)
+      })
+    }
+  }, [cycleMapState, isLoaded, agents, disasters])
+
+  // Allocation pulse animation — proportional to share
   const triggerAllocationPulse = useCallback(() => {
     if (!mapRef.current || !isLoaded) return
     const map = mapRef.current
@@ -563,15 +845,24 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     pulseSrc.setData({ type: 'FeatureCollection', features: pulseFeatures as any })
 
     let radius = 10
+    let pulseCount = 0
     const expand = () => {
-      radius += 1.2
-      if (radius > 55) {
-        map.setPaintProperty('allocation-pulse-ring', 'circle-stroke-opacity', 0)
-        pulseSrc.setData({ type: 'FeatureCollection', features: [] })
-        return
+      radius += 0.8
+      if (radius > 50) {
+        pulseCount++
+        if (pulseCount >= 3) {
+          map.setPaintProperty('allocation-pulse-ring', 'circle-stroke-opacity', 0)
+          return
+        }
+        radius = 10
       }
-      const opacity = Math.max(0, 0.7 * (1 - (radius - 10) / 45))
-      map.setPaintProperty('allocation-pulse-ring', 'circle-radius', radius)
+      const opacity = Math.max(0, 0.7 * (1 - (radius - 10) / 40))
+      map.setPaintProperty('allocation-pulse-ring', 'circle-radius', [
+        'interpolate', ['linear'], ['get', 'share'],
+        0, radius * 0.3,
+        0.5, radius * 0.7,
+        1, radius,
+      ])
       map.setPaintProperty('allocation-pulse-ring', 'circle-stroke-opacity', opacity)
       requestAnimationFrame(expand)
     }
@@ -624,12 +915,8 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
           <span className="text-gray-400">Flagged adversarial agent</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="shrink-0 border-t border-dashed border-purple-400/60" style={{ width: 12 }} />
-          <span className="text-gray-400">AXL P2P mesh link (Ed25519)</span>
-        </div>
-        <div className="flex items-center gap-2">
           <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
-          <span className="text-gray-400">Monitoring bioregion boundary</span>
+          <span className="text-gray-400">Monitoring region boundary</span>
         </div>
       </div>
     </>

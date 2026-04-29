@@ -1,4 +1,7 @@
-import 'dotenv/config'
+import { config as dotenvConfig } from 'dotenv'
+import * as path from 'path'
+dotenvConfig({ path: path.resolve(__dirname, '../../.env') })
+dotenvConfig()
 import { AXLClient } from './integrations/axl-client'
 import { createComputeBroker, runCoordinatorInference } from './integrations/zerog-compute'
 import { uploadAuditLog } from './integrations/zerog-storage'
@@ -25,12 +28,10 @@ async function runCoordinator() {
   let computeBroker: any = null
   const providerAddress = process.env.ZG_COMPUTE_PROVIDER
   if (providerAddress) {
-    try {
-      computeBroker = await createComputeBroker(privateKey)
-      console.log('[coordinator] 0G Compute broker initialized')
-    } catch (e) {
-      console.warn('[coordinator] 0G Compute unavailable:', (e as Error).message)
-    }
+    computeBroker = await createComputeBroker(privateKey)
+    console.log('[coordinator] 0G Compute broker initialized')
+  } else {
+    console.error('[coordinator] WARNING: ZG_COMPUTE_PROVIDER not set — TEE inference disabled')
   }
 
   let topo: any = null
@@ -157,10 +158,12 @@ async function runCoordinator() {
         allocationPlan = await runCoordinatorInference(computeBroker, providerAddress, gatedAssessments)
         console.log(`[coordinator] 0G Compute inference complete (TEE: ${allocationPlan.teeVerified})`)
       } catch (e) {
-        console.warn('[coordinator] 0G Compute failed, using local fallback:', (e as Error).message)
+        console.error('[coordinator] 0G Compute TEE FAILED:', (e as Error).message)
+        console.error('[coordinator] Falling back to local credibility-weighted allocation')
         allocationPlan = localFallbackAllocation(gatedAssessments, ensCredibility)
       }
     } else {
+      console.error('[coordinator] 0G Compute not available — using local allocation (teeVerified=false)')
       allocationPlan = localFallbackAllocation(gatedAssessments, ensCredibility)
     }
 

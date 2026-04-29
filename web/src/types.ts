@@ -38,3 +38,9 @@ export interface Proof {
   timestamp: number
   proofHash: string
 }
+
+export interface CycleMapState {
+  phase: string
+  activeAgent?: string
+  allocationShares: Record<string, number>
+}

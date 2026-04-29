@@ -71,10 +71,11 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[720px] max-h-[85vh] bg-[#0d1117]/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-y-auto"
+        className="w-[720px] max-h-[85vh] bg-[var(--bg-secondary)]/95 backdrop-blur-xl border border-[var(--border-medium)] rounded-2xl overflow-y-auto scrollbar-thin"
         onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-[#0d1117]/95 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex items-center justify-between">
+        <div className="h-1 bg-gradient-to-r from-[var(--accent-mesh)] via-[var(--accent-ens)] to-[var(--accent-mesh)]" />
+        <div className="sticky top-0 bg-[var(--bg-secondary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">AXL Mesh Network</h2>
             <p className="text-[11px] text-gray-500 mt-0.5">

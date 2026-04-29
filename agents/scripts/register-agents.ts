@@ -7,36 +7,92 @@ const ZG_WALLET = process.env.ZG_WALLET_ADDRESS || ''
 
 const AGENTS = [
   {
-    name: 'fire',
-    description: 'Wildfire detection agent — Western US bioregion',
-    bounds: 'POLYGON((-124.4,32.5,-114.1,42.0))',
+    name: 'pacific',
+    description: 'Wildfire detection agent — Pacific Coast (CA, OR, WA)',
+    bounds: 'POLYGON((-124.8,32.5,-114.0,49.0))',
     dataSources: ['EONET', 'FIRMS', 'GBIF', 'AirNow'],
+    axlPubkey: '',
     role: 'agent' as const,
-    axlPubkey: 'ed25519:8f3a2b7c9d1e4f6a0b5c8d2e7f1a3b6c9d4e8f2a',
   },
   {
-    name: 'water',
-    description: 'Water contamination agent — Mississippi basin',
-    bounds: 'POLYGON((-95.0,29.0,-88.0,37.0))',
-    dataSources: ['USGS', 'GBIF', 'iNaturalist'],
+    name: 'mountain',
+    description: 'Wildfire detection agent — Rocky Mountains (MT, WY, CO, ID, UT)',
+    bounds: 'POLYGON((-117.0,37.0,-104.0,49.0))',
+    dataSources: ['EONET', 'FIRMS', 'GBIF'],
+    axlPubkey: '',
     role: 'agent' as const,
-    axlPubkey: 'ed25519:2c7d4e9f1a3b6c8d0e5f2a7b4c9d1e6f3a8b5c0d',
+  },
+  {
+    name: 'central',
+    description: 'Severe weather agent — Central Plains (ND, SD, NE, KS, MN, IA)',
+    bounds: 'POLYGON((-104.0,37.0,-90.0,49.0))',
+    dataSources: ['EONET', 'FIRMS', 'GBIF'],
+    axlPubkey: '',
+    role: 'agent' as const,
+  },
+  {
+    name: 'lakes',
+    description: 'Flood monitoring agent — Great Lakes (WI, MI, IL, IN, OH)',
+    bounds: 'POLYGON((-92.0,38.0,-80.5,49.0))',
+    dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'],
+    axlPubkey: '',
+    role: 'agent' as const,
+  },
+  {
+    name: 'delta',
+    description: 'Flood monitoring agent — Mississippi Delta (LA, MS, AR, AL)',
+    bounds: 'POLYGON((-95.0,29.0,-85.0,37.0))',
+    dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'],
+    axlPubkey: '',
+    role: 'agent' as const,
+  },
+  {
+    name: 'gulf',
+    description: 'Storm & fire agent — Gulf Coast (TX, OK)',
+    bounds: 'POLYGON((-107.0,25.5,-93.0,37.0))',
+    dataSources: ['EONET', 'FIRMS', 'USGS'],
+    axlPubkey: '',
+    role: 'agent' as const,
+  },
+  {
+    name: 'atlantic',
+    description: 'Hurricane & flood agent — Atlantic Seaboard (GA, FL, SC, NC)',
+    bounds: 'POLYGON((-85.0,24.5,-75.0,37.0))',
+    dataSources: ['EONET', 'USGS', 'GBIF'],
+    axlPubkey: '',
+    role: 'agent' as const,
+  },
+  {
+    name: 'northeast',
+    description: 'Weather monitoring agent — Northeast (NY, PA, NJ, CT, MA)',
+    bounds: 'POLYGON((-80.5,38.0,-67.0,47.5))',
+    dataSources: ['EONET', 'USGS', 'GBIF'],
+    axlPubkey: '',
+    role: 'agent' as const,
   },
   {
     name: 'coordinator',
     description: 'Coordinator — aggregates assessments, runs sealed inference',
-    bounds: 'POLYGON((-124.4,24.4,-66.9,49.4))',
+    bounds: 'POLYGON((-124.8,24.4,-66.9,49.4))',
     dataSources: ['all'],
+    axlPubkey: '',
     role: 'coordinator' as const,
-    axlPubkey: 'ed25519:5a1b3c7d9e2f4a6b8c0d5e7f1a3b9c2d4e6f8a0b',
   },
   {
     name: 'rogue',
-    description: 'Adversarial test agent — submits inflated assessments to test credibility gating',
-    bounds: 'POLYGON((-90.0,25.0,-80.0,35.0))',
+    description: 'Adversarial test agent — submits inflated assessments with no proofs',
+    bounds: 'POLYGON((-180,-90,180,90))',
     dataSources: ['none'],
+    axlPubkey: '',
     role: 'agent' as const,
-    axlPubkey: 'ed25519:9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f',
+  },
+  {
+    name: 'phantom',
+    description: 'Adversarial test agent — fabricates disaster data in the Midwest',
+    bounds: 'POLYGON((-100,35,-85,45))',
+    dataSources: ['none'],
+    axlPubkey: '',
+    role: 'agent' as const,
   },
 ]
 
@@ -66,6 +122,8 @@ async function main() {
     } catch (e) {
       console.error(`  Failed: ${(e as Error).message}`)
     }
+
+    await new Promise(r => setTimeout(r, 4000))
   }
 }
 

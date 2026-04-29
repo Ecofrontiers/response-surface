@@ -15,19 +15,14 @@ function extractExifGps(file: File): Promise<[number, number] | null> {
     reader.onload = () => {
       const view = new DataView(reader.result as ArrayBuffer)
       if (view.getUint16(0) !== 0xFFD8) return resolve(null)
-
       let offset = 2
       while (offset < view.byteLength - 2) {
         const marker = view.getUint16(offset)
         if (marker === 0xFFE1) {
           const exifData = offset + 4
           const tiffStart = exifData + 6
-          if (
-            view.getUint8(exifData) === 0x45 &&
-            view.getUint8(exifData + 1) === 0x78 &&
-            view.getUint8(exifData + 2) === 0x69 &&
-            view.getUint8(exifData + 3) === 0x66
-          ) {
+          if (view.getUint8(exifData) === 0x45 && view.getUint8(exifData + 1) === 0x78 &&
+              view.getUint8(exifData + 2) === 0x69 && view.getUint8(exifData + 3) === 0x66) {
             const bigEndian = view.getUint16(tiffStart) === 0x4D4D
             const ifdOffset = view.getUint32(tiffStart + 4, !bigEndian)
             const numEntries = view.getUint16(tiffStart + ifdOffset, !bigEndian)
@@ -79,8 +74,7 @@ function extractExifGps(file: File): Promise<[number, number] | null> {
 async function hashFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  return '0x' + Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofPanelProps) {
@@ -90,29 +84,25 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
   const [fileName, setFileName] = useState('')
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleFile = useCallback(async (file: File) => {
     setFileName(file.name)
     setError('')
     setResult(null)
+    if (file.type.startsWith('image/')) setPreview(URL.createObjectURL(file))
 
     setStep('extracting')
     const gps = await extractExifGps(file)
-
-    if (!gps) {
-      setCoords([-119.4 + (Math.random() - 0.5) * 2, 37.2 + (Math.random() - 0.5) * 2])
-    } else {
-      setCoords(gps)
-    }
+    const finalCoords = gps || [-119.4 + (Math.random() - 0.5) * 2, 37.2 + (Math.random() - 0.5) * 2] as [number, number]
+    setCoords(finalCoords)
 
     setStep('hashing')
     const hash = await hashFile(file)
     setPhotoHash(hash)
 
     setStep('attesting')
-    const finalCoords = gps || [-119.4 + (Math.random() - 0.5) * 2, 37.2 + (Math.random() - 0.5) * 2]
-
     try {
       const res = await fetch('/api/proofs/submit', {
         method: 'POST',
@@ -127,23 +117,13 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
         const data = await res.json()
         setStep('done')
         setResult(data)
-        onProofSubmitted({
-          responderEns: data.proof.responderEns,
-          agentEns: data.proof.agentEns,
-          location: data.proof.location,
-          credibilityScore: data.proof.credibilityScore,
-          disasterId: data.proof.disasterId,
-          timestamp: data.proof.timestamp,
-          proofHash: data.proof.proofHash,
-        })
+        onProofSubmitted(data.proof)
         return
       }
     } catch {}
 
-    // Fallback: simulate the flow locally
     setStep('checking')
     await new Promise(r => setTimeout(r, 600))
-
     const simProof: Proof = {
       responderEns: 'responder.responsesurface.eth',
       agentEns: 'fire.responsesurface.eth',
@@ -153,11 +133,7 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
       timestamp: Date.now(),
       proofHash: hash,
     }
-    setResult({
-      success: true,
-      proof: simProof,
-      message: 'Proof recorded (simulated — API offline)',
-    })
+    setResult({ success: true, proof: simProof, message: 'Proof recorded (API offline — simulated)' })
     setStep('done')
     onProofSubmitted(simProof)
   }, [onProofSubmitted])
@@ -168,199 +144,110 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
     if (file) handleFile(file)
   }, [handleFile])
 
-  const stepLabels: Record<Step, string> = {
-    idle: '',
-    extracting: 'Extracting EXIF GPS...',
-    hashing: 'Computing SHA-256 hash...',
-    attesting: 'Creating Astral attestation...',
-    checking: 'Checking containment...',
-    done: 'Proof submitted',
-    error: 'Error',
-  }
+  const resetForm = useCallback(() => {
+    setStep('idle'); setResult(null); setCoords(null); setPhotoHash(''); setFileName(''); setError('')
+    if (preview) { URL.revokeObjectURL(preview); setPreview(null) }
+  }, [preview])
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[640px] max-h-[85vh] bg-[#0d1117]/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-y-auto"
+        className="w-[560px] max-h-[80vh] rounded-[var(--radius)] overflow-y-auto"
+        style={{ background: 'rgba(27, 45, 62, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid var(--border-default)', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-[#0d1117]/95 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 px-5 py-3 flex items-center justify-between border-b border-[var(--border-default)]" style={{ background: 'var(--color-header)' }}>
           <div>
-            <h2 className="text-lg font-semibold">Ground Truth Proofs</h2>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              Geotagged photo upload &rarr; Astral verification &rarr; ENS credibility
-            </p>
+            <h2 className="text-[14px] font-semibold text-[var(--color-text)]">Ground Truth Proofs</h2>
+            <p className="text-[10px] text-[var(--color-text-placeholder)] mt-0.5">Photo &rarr; EXIF &rarr; Astral &rarr; ENS credibility</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl cursor-pointer leading-none">&times;</button>
+          <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] cursor-pointer text-lg p-1">&times;</button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
-          <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Upload Photo Proof</h3>
-            <div
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
-                step === 'idle' ? 'border-white/10 hover:border-emerald-500/40' : 'border-emerald-500/30 bg-emerald-500/[0.03]'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => step === 'idle' && fileRef.current?.click()}
-            >
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-              {step === 'idle' ? (
-                <>
-                  <div className="text-2xl mb-2 opacity-40">&#128247;</div>
-                  <div className="text-xs text-gray-400">Drop a geotagged photo or click to upload</div>
-                  <div className="text-[10px] text-gray-600 mt-1">EXIF GPS extracted automatically &middot; SHA-256 hashed</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-xs text-emerald-400 font-medium">{fileName}</div>
-                  <div className="text-[10px] text-gray-500 mt-1">{stepLabels[step]}</div>
-                </>
-              )}
-            </div>
+        <div className="px-5 py-4 space-y-4">
+          {/* Upload */}
+          <div
+            className={`border border-dashed rounded-[var(--radius)] transition-all cursor-pointer overflow-hidden ${
+              step === 'idle' ? 'border-[var(--border-default)] hover:border-[var(--color-interactive-muted)]' : 'border-[var(--status-normal)]'
+            }`}
+            onDrop={handleDrop}
+            onDragOver={e => e.preventDefault()}
+            onClick={() => step === 'idle' && fileRef.current?.click()}
+          >
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+            {preview && step !== 'idle' ? (
+              <div className="relative">
+                <img src={preview} alt="" className="w-full h-36 object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                <div className="absolute bottom-2 left-3 text-[11px] text-white font-medium">{fileName}</div>
+                {coords && <div className="absolute bottom-2 right-3 text-[9px] text-white/60 font-[var(--font-mono)] tabular">[{coords[0].toFixed(3)}, {coords[1].toFixed(3)}]</div>}
+              </div>
+            ) : (
+              <div className="p-6 text-center">
+                <div className="text-[11px] text-[var(--color-text-secondary)]">Drop geotagged photo or click to upload</div>
+                <div className="text-[9px] text-[var(--color-text-placeholder)] mt-1">EXIF GPS &middot; SHA-256 &middot; Astral attestation</div>
+              </div>
+            )}
           </div>
 
+          {/* Pipeline */}
           {step !== 'idle' && (
-            <div>
-              <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Verification Pipeline</h3>
-              <div className="space-y-2">
-                <PipelineStep
-                  label="EXIF GPS Extraction"
-                  detail={coords ? `[${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]` : 'No GPS found — using demo coords'}
-                  done={step !== 'extracting'}
-                  active={step === 'extracting'}
-                  color="#22c55e"
-                />
-                <PipelineStep
-                  label="SHA-256 Photo Hash"
-                  detail={photoHash ? `${photoHash.slice(0, 22)}...` : ''}
-                  done={step !== 'extracting' && step !== 'hashing'}
-                  active={step === 'hashing'}
-                  color="#06b6d4"
-                />
-                <PipelineStep
-                  label="Astral Offchain Attestation"
-                  detail="EAS schema with mediaData[] + location"
-                  done={step === 'checking' || step === 'done'}
-                  active={step === 'attesting'}
-                  color="#22c55e"
-                />
-                <PipelineStep
-                  label="Containment Check"
-                  detail={result?.proof?.containment?.contained ? `Inside: ${result.proof.containment.disasterTitle}` : 'Checking disaster zones...'}
-                  done={step === 'done'}
-                  active={step === 'checking'}
-                  color="#f59e0b"
-                />
-              </div>
+            <div className="space-y-1">
+              {[
+                { label: 'EXIF GPS', detail: coords ? `[${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]` : 'demo coords', done: step !== 'extracting', active: step === 'extracting' },
+                { label: 'SHA-256', detail: photoHash ? photoHash.slice(0, 22) + '...' : '', done: !['extracting','hashing'].includes(step), active: step === 'hashing' },
+                { label: 'Astral attestation', detail: 'EAS schema', done: ['checking','done'].includes(step), active: step === 'attesting' },
+                { label: 'Containment', detail: step === 'done' ? (result?.proof?.containment?.contained ? 'Inside zone' : 'Verified') : 'Checking...', done: step === 'done', active: step === 'checking' },
+              ].map((s, i) => (
+                <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius)] bg-[var(--color-header)] border border-[var(--border-default)]">
+                  <div className="w-[6px] h-[6px] rounded-full shrink-0" style={{
+                    background: s.done ? 'var(--status-normal)' : s.active ? 'var(--status-standby)' : 'var(--status-off)',
+                    boxShadow: s.active ? '0 0 6px var(--status-standby)' : 'none',
+                  }} />
+                  <span className={`text-[10px] font-medium ${s.done ? 'text-[var(--color-text-secondary)]' : s.active ? 'text-[var(--color-text)]' : 'text-[var(--color-text-placeholder)]'}`}>
+                    {s.label}
+                  </span>
+                  <span className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] truncate ml-auto">{s.detail}</span>
+                </div>
+              ))}
             </div>
           )}
 
+          {/* Result */}
           {result && (
-            <div className={`p-3 rounded-xl border ${
-              result.proof?.containment?.contained
-                ? 'border-emerald-500/20 bg-emerald-500/[0.03]'
-                : 'border-amber-500/20 bg-amber-500/[0.03]'
-            }`}>
-              <div className="text-xs text-gray-300">{result.message}</div>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="text-[10px] text-gray-500">
-                  Credibility: <span className="text-emerald-400 font-medium">{result.proof?.credibilityScore}/1000</span>
-                </div>
-                <div className="text-[10px] text-gray-500">
-                  Hash: <span className="text-cyan-400 font-[var(--font-mono)]">{result.proof?.proofHash?.slice(0, 18)}...</span>
-                </div>
+            <div className="p-3 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
+              <div className="text-[11px] text-[var(--color-text-secondary)]">{result.message}</div>
+              <div className="mt-2 flex items-center gap-3 text-[10px]">
+                <span className="text-[var(--color-text-placeholder)]">Credibility: <span className="font-[var(--font-mono)] tabular" style={{ color: 'var(--status-normal)' }}>{result.proof?.credibilityScore}</span></span>
+                <span className="text-[var(--color-text-placeholder)]">Hash: <span className="font-[var(--font-mono)]" style={{ color: 'var(--status-standby)' }}>{result.proof?.proofHash?.slice(0, 16)}...</span></span>
               </div>
               {step === 'done' && (
-                <button
-                  className="mt-3 text-[10px] text-gray-400 hover:text-white cursor-pointer underline"
-                  onClick={() => { setStep('idle'); setResult(null); setCoords(null); setPhotoHash(''); setFileName(''); }}
-                >
-                  Submit another proof
+                <button onClick={resetForm} className="mt-2 text-[10px] cursor-pointer underline" style={{ color: 'var(--color-interactive)' }}>
+                  Submit another
                 </button>
               )}
             </div>
           )}
 
-          {error && (
-            <div className="p-3 rounded-xl border border-red-500/20 bg-red-500/[0.03]">
-              <div className="text-xs text-red-400">{error}</div>
+          {error && <div className="p-2 rounded-[var(--radius)] text-[10px]" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)' }}>{error}</div>}
+
+          {/* Submitted proofs */}
+          {proofs.length > 0 && (
+            <div>
+              <div className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--color-text-placeholder)' }}>Proofs ({proofs.length})</div>
+              <div className="space-y-1 max-h-28 overflow-y-auto">
+                {proofs.slice(-5).reverse().map((p, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px] py-1.5 px-2.5 rounded-[var(--radius)] bg-[var(--color-header)] border border-[var(--border-default)]">
+                    <span className="font-[var(--font-mono)]" style={{ color: 'var(--status-standby)' }}>{p.proofHash.slice(0, 12)}...</span>
+                    <span className="text-[var(--color-text-placeholder)]">{p.responderEns.replace('.responsesurface.eth', '')}</span>
+                    <span className="font-[var(--font-mono)] tabular font-medium" style={{ color: p.credibilityScore >= 500 ? 'var(--status-normal)' : 'var(--status-serious)' }}>{p.credibilityScore}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Submitted Proofs ({proofs.length})</h3>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto">
-              {proofs.length === 0 && (
-                <div className="text-[10px] text-gray-600 text-center py-3">
-                  No proofs submitted yet
-                </div>
-              )}
-              {proofs.slice(-6).reverse().map((p, i) => (
-                <div key={i} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                  <span className="text-cyan-400 font-[var(--font-mono)] text-[10px]">
-                    {p.proofHash.slice(0, 14)}...
-                  </span>
-                  <span className="text-gray-500 text-[10px]">
-                    {p.responderEns.replace('.responsesurface.eth', '')}
-                  </span>
-                  <span className={`text-[10px] font-medium ${p.credibilityScore >= 500 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {p.credibilityScore}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">How It Works</h3>
-            <div className="flex items-center gap-1 flex-wrap">
-              {[
-                { label: 'Photo + EXIF', color: '#22c55e' },
-                { label: 'SHA-256 hash', color: '#06b6d4' },
-                { label: 'Astral attestation', color: '#22c55e' },
-                { label: 'Containment check', color: '#f59e0b' },
-                { label: 'ENS credibility', color: '#06b6d4' },
-                { label: 'Fund allocation', color: '#f59e0b' },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  <span
-                    className="text-[10px] px-2 py-1 rounded-lg border font-medium"
-                    style={{ borderColor: `${s.color}30`, color: s.color, background: `${s.color}08` }}
-                  >
-                    {s.label}
-                  </span>
-                  {i < 5 && <span className="text-gray-600 text-[10px]">&rarr;</span>}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function PipelineStep({ label, detail, done, active, color }: {
-  label: string; detail: string; done: boolean; active: boolean; color: string
-}) {
-  return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border bg-white/[0.02]" style={{ borderColor: done ? `${color}30` : 'rgba(255,255,255,0.05)' }}>
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium border ${
-        done ? 'border-emerald-500/50 text-emerald-400' : active ? 'border-cyan-500/50 text-cyan-400 animate-pulse' : 'border-white/10 text-gray-600'
-      }`}>
-        {done ? '✓' : active ? '●' : '○'}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className={`text-xs font-medium ${done ? 'text-gray-300' : active ? 'text-white' : 'text-gray-600'}`}>{label}</div>
-        {detail && <div className="text-[10px] text-gray-500 font-[var(--font-mono)] truncate">{detail}</div>}
       </div>
     </div>
   )

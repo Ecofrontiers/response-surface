@@ -8,20 +8,23 @@ export async function getStreamflow(bbox: BBox): Promise<USGSSite[]> {
   const tiles = tileBBox(bbox)
   const results: USGSSite[] = []
 
-  for (const tile of tiles) {
+  const tileResults = await Promise.allSettled(tiles.map(async tile => {
     const params = new URLSearchParams({
       format: 'json',
       bBox: `${tile.west},${tile.south},${tile.east},${tile.north}`,
       parameterCd: '00060,00065',
       siteStatus: 'active',
     })
-    const res = await fetch(`${USGS_URL}?${params}`)
+    const res = await fetch(`${USGS_URL}?${params}`, { signal: AbortSignal.timeout(15000) })
     if (!res.ok) {
       console.warn(`USGS tile error: ${res.status} for bbox ${JSON.stringify(tile)}`)
-      continue
+      return []
     }
     const data = await res.json()
-    results.push(...parseUSGSResponse(data))
+    return parseUSGSResponse(data)
+  }))
+  for (const r of tileResults) {
+    if (r.status === 'fulfilled') results.push(...r.value)
   }
 
   return results

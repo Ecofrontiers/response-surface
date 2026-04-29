@@ -12,7 +12,7 @@ export async function getSpeciesInBBox(
     hasCoordinate: 'true',
     limit: String(limit),
   })
-  const res = await fetch(`${GBIF_URL}/occurrence/search?${params}`)
+  const res = await fetch(`${GBIF_URL}/occurrence/search?${params}`, { signal: AbortSignal.timeout(15000) })
   if (!res.ok) throw new Error(`GBIF API error: ${res.status}`)
   const data = await res.json()
   return data.results

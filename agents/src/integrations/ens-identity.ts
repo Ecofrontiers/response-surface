@@ -32,12 +32,16 @@ export async function createAgentIdentity(
 ): Promise<string> {
   const fullName = `${agentName}.${PARENT_NAME}`
 
-  await createSubname(wallet, {
-    name: fullName,
-    owner: wallet.account.address,
-    contract: 'registry',
-    resolverAddress: RESOLVER,
-  })
+  try {
+    await createSubname(wallet, {
+      name: fullName,
+      owner: wallet.account.address,
+      contract: 'registry',
+      resolverAddress: RESOLVER,
+    })
+  } catch (e) {
+    console.warn(`  Subname ${fullName} may already exist: ${(e as Error).message?.slice(0, 80)}`)
+  }
 
   await setRecords(wallet, {
     name: fullName,
@@ -46,7 +50,7 @@ export async function createAgentIdentity(
       { key: 'description', value: metadata.description },
       { key: 'bioregion.bounds', value: metadata.bounds },
       { key: 'data.sources', value: metadata.dataSources.join(',') },
-      { key: 'axl.pubkey', value: metadata.axlPubkey },
+      { key: 'axl.pubkey', value: metadata.axlPubkey || '' },
       { key: 'role', value: metadata.role },
       { key: '0g.address', value: metadata.zgAddress || '' },
     ],

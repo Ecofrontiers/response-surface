@@ -5,13 +5,13 @@ interface ActivityFeedProps {
   events: ActivityEvent[]
 }
 
-const TYPE_STYLES: Record<ActivityEvent['type'], { icon: string; color: string; bg: string }> = {
-  disaster: { icon: '⚠', color: 'text-red-400', bg: 'bg-red-500/5' },
-  assessment: { icon: '◉', color: 'text-blue-400', bg: 'bg-blue-500/5' },
-  proof: { icon: '✦', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
-  allocation: { icon: '◈', color: 'text-amber-400', bg: 'bg-amber-500/5' },
-  flag: { icon: '⚑', color: 'text-red-500', bg: 'bg-red-500/8' },
-  system: { icon: '▸', color: 'text-gray-500', bg: '' },
+const TYPE_CONFIG: Record<ActivityEvent['type'], { dot: string; text: string }> = {
+  disaster: { dot: 'var(--status-critical)', text: 'var(--status-critical)' },
+  assessment: { dot: 'var(--status-standby)', text: 'var(--color-text-secondary)' },
+  proof: { dot: 'var(--status-normal)', text: 'var(--color-text-secondary)' },
+  allocation: { dot: 'var(--status-serious)', text: 'var(--color-text-secondary)' },
+  flag: { dot: 'var(--status-critical)', text: 'var(--status-critical)' },
+  system: { dot: 'var(--status-off)', text: 'var(--color-text-placeholder)' },
 }
 
 function timeAgo(ts: number): string {
@@ -25,34 +25,44 @@ export default function ActivityFeed({ events }: ActivityFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
   }, [events.length])
 
   if (events.length === 0) {
-    return (
-      <div className="text-[10px] text-gray-600 text-center py-4">
-        Run an allocation cycle to see activity here
-      </div>
-    )
+    return <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-6">No activity yet</div>
   }
 
   return (
-    <div ref={scrollRef} className="overflow-y-auto max-h-64 divide-y divide-white/[0.03]">
-      {events.slice(0, 30).map(event => {
-        const style = TYPE_STYLES[event.type]
-        const isCycleBorder = event.type === 'system' && event.message.includes('── Cycle')
+    <div ref={scrollRef} className="overflow-y-auto space-y-px">
+      {events.slice(0, 40).map(event => {
+        const cfg = TYPE_CONFIG[event.type]
         return (
-          <div
-            key={event.id}
-            className={`px-1 py-1.5 flex items-start gap-2 text-xs ${style.bg} ${isCycleBorder ? 'border-l-2 border-cyan-500/40' : ''}`}
-          >
-            <span className={`${style.color} flex-shrink-0 mt-0.5 w-3 text-center`}>{style.icon}</span>
-            <span className={`flex-1 leading-relaxed ${isCycleBorder ? 'text-cyan-400 font-medium' : 'text-gray-400'}`}>
-              {event.message}
+          <div key={event.id} className="flex items-start gap-2 px-2 py-1.5 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="w-[6px] h-[6px] rounded-full mt-1 shrink-0" style={{ background: cfg.dot }} />
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
+                {event.message}
+              </span>
+              {event.links && event.links.length > 0 && (
+                <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                  {event.links.map((link, i) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] font-[var(--font-mono)] hover:underline"
+                      style={{ color: 'var(--color-interactive)' }}
+                    >
+                      {link.label} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+              {timeAgo(event.timestamp)}
             </span>
-            <span className="text-gray-600 flex-shrink-0 tabular-nums text-[10px]">{timeAgo(event.timestamp)}</span>
           </div>
         )
       })}
