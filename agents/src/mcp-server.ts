@@ -517,7 +517,7 @@ app.post('/api/cycle/run', async (req, res) => {
         if (containment.result) sources.push('Astral (location verified)')
       } catch (e) {
         verifiedProofDensity = 0
-        emit('system', `Astral verification failed for ${shortName(agentEns)}: ${(e as Error).message}`)
+        emit('system', `Astral verification failed for ${shortName(config.ensName)}: ${(e as Error).message}`)
       }
     }
 
