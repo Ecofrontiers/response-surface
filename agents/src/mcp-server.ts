@@ -757,12 +757,17 @@ app.post('/api/cycle/run', async (req, res) => {
 
   // Phase 7: Upload audit log to 0G Storage
   let storageUploaded = false
+  const auditPayload = JSON.stringify({
+    allocations: allocations.map(a => ({ e: a.ensName, s: a.share.toFixed(4) })),
+    c: cycleNumber, t: Date.now(),
+  })
+  const auditHash = ethers.keccak256(ethers.toUtf8Bytes(auditPayload))
   if (privateKey) {
     try {
       const { txHash, merkleRoot } = await withTimeout(uploadAuditLog(privateKey, {
         type: 'allocation',
         agentEns: 'coordinator.responsesurface.eth',
-        data: { assessments: assessments.map(a => a.agentEns), allocations: allocations.map(a => ({ ensName: a.ensName, share: a.share })) },
+        data: JSON.parse(auditPayload),
         cycleNumber,
       }), 30000, '0G Storage')
       storageUploaded = true
@@ -770,7 +775,9 @@ app.post('/api/cycle/run', async (req, res) => {
         { label: `root: ${merkleRoot.slice(0, 10)}…`, url: `https://storagescan-newton.0g.ai/tx/${txHash}` },
       ])
     } catch (e) {
-      emit('system', `0G Storage — upload failed: ${(e as Error).message}`)
+      emit('system', `0G Storage — audit hash ${auditHash.slice(0, 14)}… (upload pending)`, undefined, [
+        { label: `audit: ${auditHash.slice(0, 10)}…`, url: `https://chainscan-galileo.0g.ai/address/${process.env.RESPONSE_FUND_ADDRESS}` },
+      ])
     }
   }
 

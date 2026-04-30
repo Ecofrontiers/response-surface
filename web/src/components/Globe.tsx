@@ -441,29 +441,31 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         // --- Cycle phase animations ---
         const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
-        // COLLECT: bioregion pulse + disaster highlight
+        // COLLECT: dramatic bioregion scan + disaster highlight
         if (phase === 'collecting') {
           const elapsed = frame - phaseStartRef.current
-          const t = (elapsed % 90) / 90
+          const t = (elapsed % 50) / 50
           const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2
-          const opacity = 0.04 + pulse * 0.18
+          const opacity = 0.10 + pulse * 0.35
           map.setPaintProperty('bioregion-active-fill', 'fill-opacity', opacity)
-          map.setPaintProperty('bioregion-active-border', 'line-opacity', clamp01(opacity * 3.5))
-          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', clamp01(opacity * 3))
-          const hr = 16 + Math.sin(t * Math.PI * 2) * 6
-          map.setPaintProperty('disaster-highlight-ring', 'circle-radius', Math.max(10, hr))
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', clamp01(opacity * 4))
+          map.setPaintProperty('bioregion-active-border', 'line-width', 2.5 + pulse * 1.5)
+          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', clamp01(opacity * 4))
+          map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-width', 2.5 + pulse * 2)
+          const hr = 20 + Math.sin(t * Math.PI * 2) * 14
+          map.setPaintProperty('disaster-highlight-ring', 'circle-radius', Math.max(12, hr))
         }
 
-        // AXL: flow dots along arcs + brighten arcs
+        // AXL: fast flowing particles along mesh arcs
         if (phase === 'axl') {
-          meshFlowRef.current = (meshFlowRef.current + 0.018) % 1
+          meshFlowRef.current = (meshFlowRef.current + 0.028) % 1
           const coord = agentsRef.current.find(a => a.role === 'coordinator')
           if (coord) {
             const dots: GeoJSON.Feature[] = []
             agentsRef.current.filter(a => a.role !== 'coordinator').forEach(a => {
               const arcPts = createArc(a.bioregion.center, coord.bioregion.center)
-              for (let d = 0; d < 3; d++) {
-                const p = (meshFlowRef.current + d / 3) % 1
+              for (let d = 0; d < 6; d++) {
+                const p = (meshFlowRef.current + d / 6) % 1
                 const idx = Math.min(Math.floor(p * arcPts.length), arcPts.length - 1)
                 dots.push({
                   type: 'Feature',
@@ -475,65 +477,117 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
             const src = map.getSource('mesh-flow') as mapboxgl.GeoJSONSource
             if (src) src.setData({ type: 'FeatureCollection', features: dots })
           }
-          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0.9)
-          map.setPaintProperty('axl-arcs-line', 'line-opacity', 0.9)
-          map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0.4)
-          // Fade out bioregion from collecting phase
+          const axlPulse = (Math.sin(frame * 0.08) + 1) / 2
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 1)
+          map.setPaintProperty('mesh-flow-dots', 'circle-radius', 5 + axlPulse * 3)
+          map.setPaintProperty('axl-arcs-line', 'line-opacity', 0.8 + axlPulse * 0.2)
+          map.setPaintProperty('axl-arcs-line', 'line-width', 1.5 + axlPulse)
+          map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0.4 + axlPulse * 0.3)
           map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
           map.setPaintProperty('bioregion-active-border', 'line-opacity', 0)
           map.setPaintProperty('disaster-highlight-ring', 'circle-stroke-opacity', 0)
         }
 
-        // ENS GATE: brief verification sweep (reuse disaster highlight as a "scan" ring)
+        // ENS GATE: verification sweep — regions flash green/red
         if (phase === 'ens_gate') {
+          const elapsed = frame - phaseStartRef.current
+          const wave = (elapsed % 40) / 40
+          const scanPulse = (Math.sin(wave * Math.PI * 2) + 1) / 2
+          const opacity = 0.12 + scanPulse * 0.30
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', opacity)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', clamp01(opacity * 3.5))
+          map.setPaintProperty('bioregion-active-border', 'line-width', 2 + scanPulse * 2)
+          const fadeT = Math.min(elapsed / 25, 1)
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', clamp01(1 - fadeT))
+          map.setPaintProperty('mesh-flow-dots', 'circle-radius', 5 + fadeT * 4)
+          map.setPaintProperty('axl-arcs-line', 'line-opacity', clamp01(0.8 * (1 - fadeT)))
+          map.setPaintProperty('axl-arcs-glow', 'line-opacity', clamp01(0.5 * (1 - fadeT)))
+        }
+
+        // CREDIBILITY: regions pulse with credibility colors
+        if (phase === 'credibility') {
+          const elapsed = frame - phaseStartRef.current
+          const t = (elapsed % 70) / 70
+          const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2
+          const opacity = 0.10 + pulse * 0.28
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', opacity)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', clamp01(opacity * 3))
+          map.setPaintProperty('bioregion-active-border', 'line-width', 2 + pulse * 1.5)
           map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0)
           map.setPaintProperty('axl-arcs-line', 'line-opacity', 0)
           map.setPaintProperty('axl-arcs-glow', 'line-opacity', 0)
         }
 
-        // CREDIBILITY: keep clean
-        if (phase === 'credibility') {
-          // Agent rings update via React state; map just stays calm
-        }
-
-        // TEE: coordinator glow
+        // TEE: dramatic coordinator glow with expanding rings
         if (phase === 'tee') {
           const t = frame * 0.06
           const pulse = (Math.sin(t) + 1) / 2
-          const glowOp = 0.1 + pulse * 0.3
-          const ringR = 28 + Math.sin(t * 0.7) * 12
+          const glowOp = 0.25 + pulse * 0.55
+          const ringR = 35 + Math.sin(t * 0.7) * 22
           map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', clamp01(glowOp))
-          map.setPaintProperty('tee-glow-ring', 'circle-radius', Math.max(16, ringR))
-          map.setPaintProperty('tee-glow-inner', 'circle-opacity', clamp01(glowOp * 0.5))
+          map.setPaintProperty('tee-glow-ring', 'circle-radius', Math.max(20, ringR))
+          map.setPaintProperty('tee-glow-ring', 'circle-stroke-width', 3 + pulse * 4)
+          map.setPaintProperty('tee-glow-inner', 'circle-opacity', clamp01(glowOp * 0.7))
+          map.setPaintProperty('tee-glow-inner', 'circle-radius', 22 + pulse * 10)
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
+          map.setPaintProperty('bioregion-active-border', 'line-opacity', 0)
         }
 
-        // ALLOCATING: fund flow lines pulse
+        // ALLOCATING: fund flow with streaming particles
         if (phase === 'allocating') {
           const t = frame * 0.04
           const pulse = (Math.sin(t) + 1) / 2
-          const lineOp = 0.15 + pulse * 0.45
+          const lineOp = 0.35 + pulse * 0.50
           map.setPaintProperty('fund-flow-line', 'line-opacity', clamp01(lineOp))
-          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(lineOp * 0.3))
-          // Fade TEE glow
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(lineOp * 0.45))
           map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', 0)
           map.setPaintProperty('tee-glow-inner', 'circle-opacity', 0)
+          meshFlowRef.current = (meshFlowRef.current + 0.024) % 1
+          const coord = agentsRef.current.find(a => a.role === 'coordinator')
+          const shares = cs.allocationShares || {}
+          if (coord && Object.keys(shares).length > 0) {
+            const dots: GeoJSON.Feature[] = []
+            Object.entries(shares).forEach(([ensName, share]) => {
+              const agent = agentsRef.current.find(a => a.ensName === ensName)
+              if (!agent || agent.role === 'coordinator') return
+              const arcPts = createArc(coord.bioregion.center, agent.bioregion.center)
+              const numDots = Math.max(2, Math.round(share * 14))
+              for (let d = 0; d < numDots; d++) {
+                const p = (meshFlowRef.current + d / numDots) % 1
+                const idx = Math.min(Math.floor(p * arcPts.length), arcPts.length - 1)
+                dots.push({
+                  type: 'Feature',
+                  properties: { color: '#4ade80' },
+                  geometry: { type: 'Point', coordinates: arcPts[idx] },
+                })
+              }
+            })
+            const src = map.getSource('mesh-flow') as mapboxgl.GeoJSONSource
+            if (src) src.setData({ type: 'FeatureCollection', features: dots })
+          }
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0.95)
+          map.setPaintProperty('mesh-flow-dots', 'circle-radius', 4 + pulse * 3)
         }
 
-        // STORAGE / ENS_WRITE: keep fund flow visible but static
+        // STORAGE / ENS_WRITE: fund flow visible but calming
         if (phase === 'storage' || phase === 'ens_write') {
-          map.setPaintProperty('fund-flow-line', 'line-opacity', 0.3)
-          map.setPaintProperty('fund-flow-glow', 'line-opacity', 0.1)
+          const elapsed = frame - phaseStartRef.current
+          const fade = Math.min(elapsed / 60, 1)
+          map.setPaintProperty('fund-flow-line', 'line-opacity', 0.35 - fade * 0.15)
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', 0.15 - fade * 0.08)
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', clamp01(0.8 * (1 - fade)))
         }
 
-        // COMPLETE: flash all bioregions then fade
+        // COMPLETE: bright success flash then fade
         if (phase === 'complete') {
           const elapsed = frame - phaseStartRef.current
-          const t = Math.min(elapsed / 120, 1)
-          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', 0)
-          map.setPaintProperty('fund-flow-line', 'line-opacity', clamp01(0.3 * (1 - t)))
-          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(0.1 * (1 - t)))
-          map.setPaintProperty('bioregion-fill', 'fill-opacity', clamp01(0.06 + 0.2 * (1 - t)))
-          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', 0)
+          const t = Math.min(elapsed / 150, 1)
+          const flashOp = elapsed < 25 ? 0.40 : clamp01(0.40 * (1 - (elapsed - 25) / 125))
+          map.setPaintProperty('bioregion-fill', 'fill-opacity', flashOp + 0.06)
+          map.setPaintProperty('bioregion-active-fill', 'fill-opacity', clamp01(flashOp * 0.6))
+          map.setPaintProperty('fund-flow-line', 'line-opacity', clamp01(0.5 * (1 - t)))
+          map.setPaintProperty('fund-flow-glow', 'line-opacity', clamp01(0.25 * (1 - t)))
+          map.setPaintProperty('mesh-flow-dots', 'circle-opacity', clamp01(0.9 * (1 - t)))
           map.setPaintProperty('tee-glow-ring', 'circle-stroke-opacity', 0)
           map.setPaintProperty('tee-glow-inner', 'circle-opacity', 0)
         }
@@ -774,6 +828,36 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         if (src) src.setData(EMPTY_FC)
         const dSrc = map.getSource('disaster-highlight') as mapboxgl.GeoJSONSource
         if (dSrc) dSrc.setData(EMPTY_FC)
+      }
+    }
+
+    // ENS GATE: flash all regions green (verified) or red (flagged)
+    if (phase === 'ens_gate') {
+      const src = map.getSource('bioregion-active') as mapboxgl.GeoJSONSource
+      if (src) {
+        const features = agents
+          .filter(a => a.role !== 'coordinator' && BIOREGION_POLYGONS[a.ensName])
+          .map(a => ({
+            type: 'Feature' as const,
+            properties: { color: a.status === 'flagged' ? '#ef4444' : '#22c55e' },
+            geometry: { type: 'Polygon' as const, coordinates: [BIOREGION_POLYGONS[a.ensName]] },
+          }))
+        src.setData({ type: 'FeatureCollection', features })
+      }
+    }
+
+    // CREDIBILITY: color regions by credibility score
+    if (phase === 'credibility') {
+      const src = map.getSource('bioregion-active') as mapboxgl.GeoJSONSource
+      if (src) {
+        const features = agents
+          .filter(a => a.role !== 'coordinator' && BIOREGION_POLYGONS[a.ensName])
+          .map(a => ({
+            type: 'Feature' as const,
+            properties: { color: credibilityColor(a.credibilityScore) },
+            geometry: { type: 'Polygon' as const, coordinates: [BIOREGION_POLYGONS[a.ensName]] },
+          }))
+        src.setData({ type: 'FeatureCollection', features })
       }
     }
 
