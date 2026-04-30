@@ -13,10 +13,17 @@ function formatEth(wei: bigint): string {
 }
 
 const AGENT_COLORS: Record<string, string> = {
-  fire: '#ff3838',
-  water: '#2dccff',
+  pacific: '#f97316',
+  mountain: '#ef4444',
+  central: '#f59e0b',
+  lakes: '#3b82f6',
+  delta: '#06b6d4',
+  gulf: '#8b5cf6',
+  atlantic: '#10b981',
+  northeast: '#6366f1',
   coordinator: '#ffb302',
   rogue: '#ff3838',
+  phantom: '#ff3838',
 }
 
 function agentShortName(ensName: string): string {
@@ -27,18 +34,21 @@ function AllocationBar({ allocations }: { allocations: Allocation[] }) {
   const total = allocations.reduce((s, a) => s + a.amount, 0n)
   if (total === 0n) return null
 
-  const slices = allocations.map(a => ({
-    name: agentShortName(a.ensName),
-    color: AGENT_COLORS[agentShortName(a.ensName)] || 'var(--status-off)',
-    share: Number(a.amount) / Number(total),
-  }))
+  const slices = allocations
+    .map(a => ({
+      name: agentShortName(a.ensName),
+      color: AGENT_COLORS[agentShortName(a.ensName)] || 'var(--status-off)',
+      share: Number(a.amount) / Number(total),
+      amount: a.amount,
+    }))
+    .sort((a, b) => b.share - a.share)
 
   return (
     <div className="mt-3 pt-3 border-t border-[var(--border-default)]">
       {/* Stacked bar — FIRMS style, 4px height */}
-      <div className="flex h-1 rounded-[1px] overflow-hidden gap-px">
+      <div className="flex h-1.5 rounded-[1px] overflow-hidden gap-px">
         {slices.map((s, i) => (
-          <div key={i} className="h-full rounded-[1px]" style={{ width: `${s.share * 100}%`, background: s.color, opacity: 0.8 }} />
+          <div key={i} className="h-full rounded-[1px]" style={{ width: `${s.share * 100}%`, background: s.color, opacity: 0.85 }} />
         ))}
       </div>
       <div className="mt-2 space-y-0.5">
@@ -48,6 +58,9 @@ function AllocationBar({ allocations }: { allocations: Allocation[] }) {
             <span className="text-[var(--color-text-placeholder)] flex-1">{s.name}</span>
             <span className="font-[var(--font-mono)] tabular text-[var(--color-text-secondary)]">
               {(s.share * 100).toFixed(1)}%
+            </span>
+            <span className="font-[var(--font-mono)] tabular text-[var(--color-text-placeholder)] text-[9px] w-[52px] text-right">
+              {formatEth(s.amount)}
             </span>
           </div>
         ))}

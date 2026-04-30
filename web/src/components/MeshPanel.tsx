@@ -45,15 +45,16 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
 
   useEffect(() => {
     const fallbackNodes: MeshNode[] = [
-      { name: 'coordinator', port: 9022, online: true, peerId: 'ed25519:5a1b3c7d', peerCount: 3, connectedTo: [] },
-      { name: 'fire', port: 9002, online: true, peerId: 'ed25519:8f3a2b7c', peerCount: 3, connectedTo: [] },
-      { name: 'water', port: 9012, online: true, peerId: 'ed25519:2c7d4e9f', peerCount: 2, connectedTo: [] },
-      { name: 'rogue', port: 9032, online: true, peerId: 'ed25519:9e0f1a2b', peerCount: 2, connectedTo: [] },
+      { name: 'coordinator', port: 9022, online: false, peerId: '', peerCount: 0, connectedTo: [] },
+      { name: 'pacific', port: 9002, online: false, peerId: '', peerCount: 0, connectedTo: [] },
+      { name: 'mountain', port: 9012, online: false, peerId: '', peerCount: 0, connectedTo: [] },
+      { name: 'lakes', port: 9032, online: false, peerId: '', peerCount: 0, connectedTo: [] },
+      { name: 'rogue', port: 9082, online: false, peerId: '', peerCount: 0, connectedTo: [] },
     ]
     const fallbackDiscovery: DiscoveredAgent[] = [
-      { peerId: 'ed25519:fire-agent-pubkey', card: { name: 'fire.responsesurface.eth', description: 'Fire bioregional agent — California', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'simulated' },
-      { peerId: 'ed25519:water-agent-pubkey', card: { name: 'water.responsesurface.eth', description: 'Water bioregional agent — Gulf Coast', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'simulated' },
-      { peerId: 'ed25519:rogue-agent-pubkey', card: { name: 'rogue.responsesurface.eth', description: 'Adversarial agent — global', capabilities: ['assessment'], services: ['assessment'] }, status: 'simulated' },
+      { peerId: '', card: { name: 'pacific.responsesurface.eth', description: 'Pacific Coast agent', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: '', card: { name: 'lakes.responsesurface.eth', description: 'Great Lakes agent', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: '', card: { name: 'rogue.responsesurface.eth', description: 'Adversarial agent — global', capabilities: ['assessment'], services: ['assessment'] }, status: 'offline' },
     ]
 
     Promise.all([

@@ -44,3 +44,13 @@ export interface CycleMapState {
   activeAgent?: string
   allocationShares: Record<string, number>
 }
+
+export interface AgentMessage {
+  id: string
+  timestamp: number
+  sender: string
+  receiver?: string
+  content: string
+  phase: string
+  type: 'report' | 'relay' | 'query' | 'result' | 'alert'
+}

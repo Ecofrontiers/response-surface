@@ -4,62 +4,26 @@ import Globe from './components/Globe'
 import FundPanel from './components/FundPanel'
 import AgentPanel from './components/AgentPanel'
 import ActivityFeed from './components/ActivityFeed'
+import AgentMessageLog from './components/AgentMessageLog'
 import CycleSimulator from './components/CycleSimulator'
 import ArchitecturePanel from './components/ArchitecturePanel'
 import MeshPanel from './components/MeshPanel'
 import ProofPanel from './components/ProofPanel'
 import ENSPanel from './components/ENSPanel'
-import type { Agent, Disaster, Allocation, Proof, CycleMapState } from './types'
+import type { Agent, Disaster, Allocation, Proof, CycleMapState, AgentMessage } from './types'
 
 const FALLBACK_AGENTS: Agent[] = [
-  {
-    ensName: 'fire.responsesurface.eth',
-    role: 'agent',
-    bioregion: {
-      bbox: { west: -124.4, south: 32.5, east: -114.1, north: 42.0 },
-      center: [-119.4, 37.2],
-    },
-    dataSources: ['EONET', 'FIRMS', 'GBIF', 'AirNow'],
-    axlPubkey: 'ed25519:8f3a2b7c9d1e4f6a0b5c8d2e7f1a3b6c9d4e8f2a',
-    status: 'active',
-    credibilityScore: 901,
-  },
-  {
-    ensName: 'water.responsesurface.eth',
-    role: 'agent',
-    bioregion: {
-      bbox: { west: -95.0, south: 29.0, east: -88.0, north: 37.0 },
-      center: [-91.5, 33.0],
-    },
-    dataSources: ['USGS', 'GBIF', 'iNaturalist'],
-    axlPubkey: 'ed25519:2c7d4e9f1a3b6c8d0e5f2a7b4c9d1e6f3a8b5c0d',
-    status: 'active',
-    credibilityScore: 604,
-  },
-  {
-    ensName: 'coordinator.responsesurface.eth',
-    role: 'coordinator',
-    bioregion: {
-      bbox: { west: -124.4, south: 24.4, east: -66.9, north: 49.4 },
-      center: [-95.7, 37.0],
-    },
-    dataSources: ['all'],
-    axlPubkey: 'ed25519:5a1b3c7d9e2f4a6b8c0d5e7f1a3b9c2d4e6f8a0b',
-    status: 'active',
-    credibilityScore: 1000,
-  },
-  {
-    ensName: 'rogue.responsesurface.eth',
-    role: 'adversary',
-    bioregion: {
-      bbox: { west: -180, south: -90, east: 180, north: 90 },
-      center: [-110, 40],
-    },
-    dataSources: ['EONET'],
-    axlPubkey: '',
-    status: 'flagged',
-    credibilityScore: 101,
-  },
+  { ensName: 'pacific.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -124.8, south: 32.5, east: -114.5, north: 49.0 }, center: [-120.0, 41.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF', 'AirNow'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'mountain.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -114.5, south: 37.0, east: -104.0, north: 49.0 }, center: [-109.0, 43.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'central.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -104.0, south: 37.0, east: -90.0, north: 49.0 }, center: [-97.0, 43.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'lakes.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -90.0, south: 37.0, east: -80.5, north: 49.0 }, center: [-85.5, 43.0] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'delta.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -90.0, south: 25.0, east: -80.5, north: 37.0 }, center: [-86.0, 33.0] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'gulf.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -114.5, south: 25.8, east: -90.0, north: 37.0 }, center: [-102.0, 33.0] }, dataSources: ['EONET', 'FIRMS', 'USGS'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'atlantic.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -80.5, south: 24.5, east: -67.0, north: 42.0 }, center: [-75.0, 34.0] }, dataSources: ['EONET', 'USGS', 'GBIF'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'northeast.responsesurface.eth', role: 'agent', bioregion: { bbox: { west: -80.5, south: 42.0, east: -67.0, north: 49.0 }, center: [-74.0, 45.0] }, dataSources: ['EONET', 'USGS', 'GBIF'], axlPubkey: '', status: 'active', credibilityScore: 0 },
+  { ensName: 'coordinator.responsesurface.eth', role: 'coordinator', bioregion: { bbox: { west: -124.8, south: 24.4, east: -66.9, north: 49.4 }, center: [-95.7, 37.0] }, dataSources: ['all'], axlPubkey: '', status: 'active', credibilityScore: 1000 },
+  { ensName: 'rogue.responsesurface.eth', role: 'adversary', bioregion: { bbox: { west: -180, south: -90, east: 180, north: 90 }, center: [-110, 40] }, dataSources: ['EONET'], axlPubkey: '', status: 'flagged', credibilityScore: 0 },
+  { ensName: 'phantom.responsesurface.eth', role: 'adversary', bioregion: { bbox: { west: -100, south: 35, east: -85, north: 45 }, center: [-92.5, 40] }, dataSources: ['EONET'], axlPubkey: '', status: 'flagged', credibilityScore: 0 },
 ]
 
 export interface ActivityEvent {
@@ -80,13 +44,9 @@ const AGENT_COLORS: Record<string, string> = {
   gulf: '#8b5cf6',
   atlantic: '#10b981',
   northeast: '#6366f1',
-  coordinator: '#f59e0b',
-  rogue: '#ff3838',
-  phantom: '#ff3838',
-  fire: '#ff3838',
-  water: '#2dccff',
   coordinator: '#ffb302',
   rogue: '#ff3838',
+  phantom: '#ff3838',
 }
 
 const AGENT_DESCRIPTIONS: Record<string, string> = {
@@ -131,8 +91,19 @@ export default function App() {
   const [showMesh, setShowMesh] = useState(false)
   const [showProofs, setShowProofs] = useState(false)
   const [showENS, setShowENS] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'activity'>('dashboard')
+  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'activity' | 'comms'>('dashboard')
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
+  const [messages, setMessages] = useState<AgentMessage[]>([])
+
+  const addMessage = useCallback((msg: AgentMessage) => {
+    setMessages(prev => {
+      if (msg.phase === 'COLLECT' && msg.content.includes('Initiating')) {
+        setSidebarTab('comms')
+        return [msg]
+      }
+      return [...prev, msg]
+    })
+  }, [])
 
   const addActivity = useCallback((event: Omit<ActivityEvent, 'id' | 'timestamp'>) => {
     setActivities(prev => {
@@ -263,6 +234,21 @@ export default function App() {
               Dashboard
             </button>
             <button
+              onClick={() => setSidebarTab('comms')}
+              className={`flex-1 py-2.5 text-[11px] font-medium tracking-wider uppercase transition-colors cursor-pointer border-b-2 relative ${
+                sidebarTab === 'comms'
+                  ? 'text-[var(--color-interactive)] border-[var(--color-interactive)]'
+                  : 'text-[var(--color-text-placeholder)] border-transparent hover:text-[var(--color-text-secondary)]'
+              }`}
+            >
+              Comms
+              {messages.length > 0 && sidebarTab !== 'comms' && (
+                <span className="ml-1 text-[9px] tabular" style={{ color: 'var(--viz-3)' }}>
+                  {messages.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setSidebarTab('activity')}
               className={`flex-1 py-2.5 text-[11px] font-medium tracking-wider uppercase transition-colors cursor-pointer border-b-2 relative ${
                 sidebarTab === 'activity'
@@ -330,11 +316,26 @@ export default function App() {
                         style={{ borderLeft: `3px solid ${color}` }}
                         onClick={() => setSelectedAgent(agent.ensName)}
                       >
-                        {/* Status dot */}
-                        <div
-                          className={`w-[8px] h-[8px] rounded-full shrink-0 ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
-                          style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
-                        />
+                        {/* Agent avatar with letter fallback */}
+                        <div className="relative shrink-0 w-[28px] h-[28px]">
+                          <div
+                            className="w-full h-full rounded-full flex items-center justify-center text-[11px] font-bold uppercase"
+                            style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `1.5px solid ${color}` }}
+                          >
+                            {name[0]}
+                          </div>
+                          <img
+                            src={`/images/agents/${name}.webp`}
+                            alt=""
+                            className="absolute inset-0 w-full h-full rounded-full object-cover border"
+                            style={{ borderColor: color }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                          <div
+                            className={`absolute -bottom-px -right-px w-[8px] h-[8px] rounded-full border border-[var(--color-surface)] ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
+                            style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
+                          />
+                        </div>
 
                         {/* Name + desc */}
                         <div className="flex-1 min-w-0">
@@ -403,6 +404,7 @@ export default function App() {
                       setFundAllocated(allocated)
                     }}
                     onMapState={setCycleMapState}
+                    onMessage={addMessage}
                   />
                   {disasters.length === 0 && (
                     <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
@@ -416,6 +418,10 @@ export default function App() {
                   )}
                 </div>
               </>
+            ) : sidebarTab === 'comms' ? (
+              <div className="px-3 py-2">
+                <AgentMessageLog messages={messages} />
+              </div>
             ) : (
               <div className="px-3 py-2">
                 <ActivityFeed events={activities} />

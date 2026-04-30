@@ -144,14 +144,14 @@ async function getAxlPubkey(port: number): Promise<string> {
 }
 
 const agentConfigs = [
-  { ensName: 'pacific.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -124.8, south: 32.5, east: -114.0, north: 49.0 }, center: [-120.5, 40.5] }, dataSources: ['EONET', 'FIRMS', 'GBIF', 'AirNow'] },
-  { ensName: 'mountain.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -117.0, south: 37.0, east: -104.0, north: 49.0 }, center: [-110.5, 43.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF'] },
+  { ensName: 'pacific.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -124.8, south: 32.5, east: -114.5, north: 49.0 }, center: [-120.0, 41.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF', 'AirNow'] },
+  { ensName: 'mountain.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -114.5, south: 37.0, east: -104.0, north: 49.0 }, center: [-109.0, 43.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF'] },
   { ensName: 'central.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -104.0, south: 37.0, east: -90.0, north: 49.0 }, center: [-97.0, 43.0] }, dataSources: ['EONET', 'FIRMS', 'GBIF'] },
-  { ensName: 'lakes.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -92.0, south: 38.0, east: -80.5, north: 49.0 }, center: [-86.5, 43.5] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'] },
-  { ensName: 'delta.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -95.0, south: 29.0, east: -85.0, north: 37.0 }, center: [-90.0, 33.0] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'] },
-  { ensName: 'gulf.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -107.0, south: 25.5, east: -93.0, north: 37.0 }, center: [-100.0, 31.0] }, dataSources: ['EONET', 'FIRMS', 'USGS'] },
-  { ensName: 'atlantic.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -85.0, south: 24.5, east: -75.0, north: 37.0 }, center: [-80.0, 31.0] }, dataSources: ['EONET', 'USGS', 'GBIF'] },
-  { ensName: 'northeast.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -80.5, south: 38.0, east: -67.0, north: 47.5 }, center: [-73.5, 42.5] }, dataSources: ['EONET', 'USGS', 'GBIF'] },
+  { ensName: 'lakes.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -90.0, south: 37.0, east: -80.5, north: 49.0 }, center: [-85.5, 43.0] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'] },
+  { ensName: 'delta.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -90.0, south: 25.0, east: -80.5, north: 37.0 }, center: [-86.0, 33.0] }, dataSources: ['EONET', 'USGS', 'GBIF', 'iNaturalist'] },
+  { ensName: 'gulf.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -114.5, south: 25.8, east: -90.0, north: 37.0 }, center: [-102.0, 33.0] }, dataSources: ['EONET', 'FIRMS', 'USGS'] },
+  { ensName: 'atlantic.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -80.5, south: 24.5, east: -67.0, north: 42.0 }, center: [-75.0, 34.0] }, dataSources: ['EONET', 'USGS', 'GBIF'] },
+  { ensName: 'northeast.responsesurface.eth', defaultRole: 'agent', bioregion: { bbox: { west: -80.5, south: 42.0, east: -67.0, north: 49.0 }, center: [-74.0, 45.0] }, dataSources: ['EONET', 'USGS', 'GBIF'] },
   { ensName: 'coordinator.responsesurface.eth', defaultRole: 'coordinator', bioregion: { bbox: { west: -124.8, south: 24.4, east: -66.9, north: 49.4 }, center: [-95.7, 37.0] }, dataSources: ['all'] },
   { ensName: 'rogue.responsesurface.eth', defaultRole: 'adversary', bioregion: { bbox: { west: -180, south: -90, east: 180, north: 90 }, center: [-110, 40] }, dataSources: ['EONET'] },
   { ensName: 'phantom.responsesurface.eth', defaultRole: 'adversary', bioregion: { bbox: { west: -100, south: 35, east: -85, north: 45 }, center: [-92.5, 40] }, dataSources: ['EONET'] },
@@ -272,7 +272,7 @@ app.post('/api/proofs/submit', async (req, res) => {
 
     const proof = {
       responderEns: responderEns || 'anonymous.responsesurface.eth',
-      agentEns: agentEns || 'fire.responsesurface.eth',
+      agentEns: agentEns || 'pacific.responsesurface.eth',
       location: { type: 'Point' as const, coordinates: location.coordinates },
       credibilityScore: 0,
       disasterId: disasterId || 'proof-submission',
@@ -355,15 +355,15 @@ const cycleAgentConfigs = [
   {
     ensName: 'pacific.responsesurface.eth',
     role: 'fire' as const,
-    bbox: { west: -124.8, south: 32.5, east: -114.0, north: 49.0 } as BBox,
-    center: [-120.5, 40.5] as [number, number],
+    bbox: { west: -124.8, south: 32.5, east: -114.5, north: 49.0 } as BBox,
+    center: [-120.0, 41.0] as [number, number],
     axlPort: 9002,
   },
   {
     ensName: 'mountain.responsesurface.eth',
     role: 'fire' as const,
-    bbox: { west: -117.0, south: 37.0, east: -104.0, north: 49.0 } as BBox,
-    center: [-110.5, 43.0] as [number, number],
+    bbox: { west: -114.5, south: 37.0, east: -104.0, north: 49.0 } as BBox,
+    center: [-109.0, 43.0] as [number, number],
     axlPort: 9012,
   },
   {
@@ -376,36 +376,36 @@ const cycleAgentConfigs = [
   {
     ensName: 'lakes.responsesurface.eth',
     role: 'water' as const,
-    bbox: { west: -92.0, south: 38.0, east: -80.5, north: 49.0 } as BBox,
-    center: [-86.5, 43.5] as [number, number],
+    bbox: { west: -90.0, south: 37.0, east: -80.5, north: 49.0 } as BBox,
+    center: [-85.5, 43.0] as [number, number],
     axlPort: 9032,
   },
   {
     ensName: 'delta.responsesurface.eth',
     role: 'water' as const,
-    bbox: { west: -95.0, south: 29.0, east: -85.0, north: 37.0 } as BBox,
-    center: [-90.0, 33.0] as [number, number],
+    bbox: { west: -90.0, south: 25.0, east: -80.5, north: 37.0 } as BBox,
+    center: [-86.0, 33.0] as [number, number],
     axlPort: 9042,
   },
   {
     ensName: 'gulf.responsesurface.eth',
     role: 'fire' as const,
-    bbox: { west: -107.0, south: 25.5, east: -93.0, north: 37.0 } as BBox,
-    center: [-100.0, 31.0] as [number, number],
+    bbox: { west: -114.5, south: 25.8, east: -90.0, north: 37.0 } as BBox,
+    center: [-102.0, 33.0] as [number, number],
     axlPort: 9052,
   },
   {
     ensName: 'atlantic.responsesurface.eth',
     role: 'water' as const,
-    bbox: { west: -85.0, south: 24.5, east: -75.0, north: 37.0 } as BBox,
-    center: [-80.0, 31.0] as [number, number],
+    bbox: { west: -80.5, south: 24.5, east: -67.0, north: 42.0 } as BBox,
+    center: [-75.0, 34.0] as [number, number],
     axlPort: 9062,
   },
   {
     ensName: 'northeast.responsesurface.eth',
     role: 'water' as const,
-    bbox: { west: -80.5, south: 38.0, east: -67.0, north: 47.5 } as BBox,
-    center: [-73.5, 42.5] as [number, number],
+    bbox: { west: -80.5, south: 42.0, east: -67.0, north: 49.0 } as BBox,
+    center: [-74.0, 45.0] as [number, number],
     axlPort: 9072,
   },
   {
@@ -652,8 +652,19 @@ app.post('/api/cycle/run', async (req, res) => {
     emit('system', `0G Compute — TEE not configured, using local credibility weighting`)
   }
 
-  // Phase 5: Build allocations
-  const fundPool = 10000000000000000000n
+  // Phase 5: Build allocations — read real contract balance
+  let fundPool = 10000000000000000000n
+  if (process.env.RESPONSE_FUND_ADDRESS) {
+    try {
+      const readContract = createFundContractReadonly(process.env.RESPONSE_FUND_ADDRESS)
+      const state = await getFundState(readContract)
+      const realBalance = BigInt(state.balance)
+      if (realBalance > 0n) fundPool = realBalance
+      emit('system', `ResponseFund balance: ${fmtEth(state.balance)} fUSD available`)
+    } catch (e) {
+      emit('system', `ResponseFund balance read failed, using default pool: ${(e as Error).message}`)
+    }
+  }
   const totalWeight = scored.reduce((s, a) => s + a.weight, 0)
 
   const allocations = scored.map(s => {

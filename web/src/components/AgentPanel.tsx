@@ -9,10 +9,17 @@ interface AgentPanelProps {
 }
 
 const AGENT_COLORS: Record<string, string> = {
-  fire: '#ff3838',
-  water: '#2dccff',
+  pacific: '#f97316',
+  mountain: '#ef4444',
+  central: '#f59e0b',
+  lakes: '#3b82f6',
+  delta: '#06b6d4',
+  gulf: '#8b5cf6',
+  atlantic: '#10b981',
+  northeast: '#6366f1',
   coordinator: '#ffb302',
   rogue: '#ff3838',
+  phantom: '#ff3838',
 }
 
 function credColor(score: number): string {
@@ -41,19 +48,36 @@ export default function AgentPanel({ ensName, agent, textRecords, proofs, onClos
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-[14px] font-semibold text-[var(--color-text)]">{ensName}</h2>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-[9px] px-1.5 py-px rounded-[2px] uppercase tracking-wider font-medium"
-                style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
-                {agent.role}
-              </span>
-              {agent.status === 'flagged' && (
+          <div className="flex items-start gap-3">
+            <div className="relative shrink-0 w-[40px] h-[40px]">
+              <div
+                className="w-full h-full rounded-full flex items-center justify-center text-[14px] font-bold uppercase"
+                style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `2px solid ${color}` }}
+              >
+                {name[0]}
+              </div>
+              <img
+                src={`/images/agents/${name}.webp`}
+                alt=""
+                className="absolute inset-0 w-full h-full rounded-full object-cover border-2"
+                style={{ borderColor: color }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            </div>
+            <div>
+              <h2 className="text-[14px] font-semibold text-[var(--color-text)]">{ensName}</h2>
+              <div className="flex items-center gap-1.5 mt-1">
                 <span className="text-[9px] px-1.5 py-px rounded-[2px] uppercase tracking-wider font-medium"
-                  style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
-                  flagged
+                  style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
+                  {agent.role}
                 </span>
-              )}
+                {agent.status === 'flagged' && (
+                  <span className="text-[9px] px-1.5 py-px rounded-[2px] uppercase tracking-wider font-medium"
+                    style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
+                    flagged
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] cursor-pointer text-lg leading-none p-1">&times;</button>

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { ActivityEvent } from '../App'
-import type { Agent, Disaster, Allocation, CycleMapState } from '../types'
+import type { Agent, Disaster, Allocation, CycleMapState, AgentMessage } from '../types'
 
 interface CycleSimulatorProps {
   agents: Agent[]
@@ -12,6 +12,7 @@ interface CycleSimulatorProps {
   onAgentUpdate: (ensName: string, updates: Partial<Agent>) => void
   onFundUpdate: (balance: bigint, allocated: bigint) => void
   onMapState?: (state: CycleMapState) => void
+  onMessage?: (msg: AgentMessage) => void
 }
 
 interface BackendEvent {
@@ -56,48 +57,78 @@ function phaseIndex(key: string): number {
 }
 
 export default function CycleSimulator({
-  agents, disasters, cycleNumber, onActivity, onAllocations, onCycleAdvance, onAgentUpdate, onFundUpdate, onMapState,
+  agents, disasters, cycleNumber, onActivity, onAllocations, onCycleAdvance, onAgentUpdate, onFundUpdate, onMapState, onMessage,
 }: CycleSimulatorProps) {
   const [running, setRunning] = useState(false)
   const [phase, setPhase] = useState('')
-  const [mode, setMode] = useState<'live' | 'offline' | ''>('')
+  const [error, setError] = useState('')
   const cancelledRef = useRef(false)
 
   const emitMap = (phase: string, activeAgent?: string, allocationShares: Record<string, number> = {}) => {
     onMapState?.({ phase, activeAgent, allocationShares })
   }
 
+  const emitMsg = (sender: string, content: string, phase: string, type: AgentMessage['type'], receiver?: string) => {
+    onMessage?.({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      sender,
+      receiver,
+      content,
+      phase,
+      type,
+    })
+  }
+
   const playBackEvents = async (events: BackendEvent[], allocShares: Record<string, number>) => {
+    let currentMsgPhase = 'COLLECT'
     for (const event of events) {
       if (cancelledRef.current) return
 
       if (event.type === 'assessment') {
         setPhase('collecting')
         emitMap('collecting', event.agent)
+        currentMsgPhase = 'COLLECT'
+        if (event.agent) emitMsg(event.agent, event.message.replace(`${event.agent}: `, ''), currentMsgPhase, 'report', 'coordinator.responsesurface.eth')
       } else if (event.type === 'system' && event.message.startsWith('AXL')) {
         setPhase('axl')
         emitMap('axl')
+        currentMsgPhase = 'AXL'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'relay')
       } else if (event.type === 'system' && event.message.startsWith('ENS') && !event.message.includes('updated')) {
         setPhase('ens_gate')
         emitMap('ens_gate')
+        currentMsgPhase = 'ENS GATE'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'query')
       } else if (event.type === 'proof' || event.type === 'flag') {
         setPhase('credibility')
         emitMap('credibility', event.agent)
+        currentMsgPhase = 'SCORE'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, event.type === 'flag' ? 'alert' : 'result')
       } else if (event.type === 'system' && event.message.startsWith('0G Compute')) {
         setPhase('tee')
         emitMap('tee')
+        currentMsgPhase = 'TEE'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'query', '0G Compute')
       } else if (event.type === 'allocation') {
         setPhase('allocating')
         emitMap('allocating', event.agent, allocShares)
+        currentMsgPhase = 'FUND'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'result')
       } else if (event.type === 'system' && event.message.startsWith('ResponseFund')) {
         setPhase('allocating')
         emitMap('allocating', undefined, allocShares)
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'relay', 'ResponseFund')
       } else if (event.type === 'system' && event.message.startsWith('0G Storage')) {
         setPhase('storage')
         emitMap('storage', undefined, allocShares)
+        currentMsgPhase = 'AUDIT'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'relay', '0G Storage')
       } else if (event.type === 'system' && event.message.includes('ENS updated')) {
         setPhase('ens_write')
         emitMap('ens_write', event.agent, allocShares)
+        currentMsgPhase = 'WRITE'
+        emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'result')
       }
 
       onActivity({ type: event.type, agent: event.agent, message: event.message, links: event.links })
@@ -113,132 +144,48 @@ export default function CycleSimulator({
     }
   }
 
-  const runCycleLive = async () => {
-    setPhase('collecting')
-    setMode('live')
-    emitMap('collecting')
-    const res = await fetch('/api/cycle/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cycleNumber }),
-    })
-    if (!res.ok) throw new Error(`Backend returned ${res.status}`)
-    const result: CycleResult = await res.json()
-
-    const allocShares: Record<string, number> = {}
-    result.allocations.forEach(a => { allocShares[a.ensName] = a.share })
-
-    await playBackEvents(result.events, allocShares)
-    for (const a of result.assessments) onAgentUpdate(a.agentEns, { credibilityScore: a.credibility })
-    const newAllocations: Allocation[] = result.allocations.map(a => ({
-      agent: a.ensName, ensName: a.ensName, amount: BigInt(a.amount),
-      disasterId: a.disasterId, timestamp: a.timestamp,
-      assessmentHash: a.assessmentHash, teeVerified: a.teeVerified,
-    }))
-    onAllocations(newAllocations)
-    const totalAllocated = result.totalAllocated ? BigInt(result.totalAllocated) : newAllocations.reduce((s, a) => s + a.amount, 0n)
-    const balance = result.fundBalance ? BigInt(result.fundBalance) : 10000000000000000000n - totalAllocated
-    onFundUpdate(balance > 0n ? balance : 0n, totalAllocated)
-  }
-
-  const runCycleOffline = async () => {
-    setPhase('collecting')
-    setMode('offline')
-    emitMap('collecting')
-    onActivity({ type: 'system', message: `Cycle ${cycleNumber} (LOCAL)` })
-    await delay(600)
-    const fundPool = 10000000000000000000n
-    const assessmentAgents = agents.filter(a => a.role === 'agent' || a.role === 'adversary')
-    const scored: { ensName: string; severity: number; proofCount: number; credibility: number; weight: number }[] = []
-    for (const agent of assessmentAgents) {
-      if (cancelledRef.current) return
-      const isRogue = agent.role === 'adversary'
-      const severity = isRogue ? 9 : Math.floor(Math.random() * 5) + 4
-      const proofCount = isRogue ? 0 : Math.floor(Math.random() * 3) + 2
-      const raw = 400 + Math.min(severity * 30, 300) + Math.min(proofCount * 150, 300)
-      const mult = Math.min(0.15 + proofCount * 0.28, 1.0)
-      const credibility = Math.min(Math.round(raw * mult), 1000)
-      scored.push({ ensName: agent.ensName, severity, proofCount, credibility, weight: credibility * severity })
-      emitMap('collecting', agent.ensName)
-      onActivity({ type: 'assessment', agent: agent.ensName, message: `${agent.ensName}: severity ${severity}, ${proofCount} proofs` })
-      await delay(1500)
-    }
-
-    setPhase('axl')
-    emitMap('axl')
-    onActivity({ type: 'system', message: 'AXL offline — local relay' })
-    await delay(2500)
-
-    setPhase('ens_gate')
-    emitMap('ens_gate')
-    await delay(800)
-
-    setPhase('credibility')
-    for (const s of scored) {
-      if (cancelledRef.current) return
-      const isRogue = s.proofCount === 0
-      emitMap('credibility', s.ensName)
-      onActivity({ type: isRogue ? 'flag' : 'proof', agent: s.ensName, message: `${s.ensName}: credibility ${s.credibility}/1000${isRogue ? ' — 0 proofs' : ''}` })
-      onAgentUpdate(s.ensName, { credibilityScore: s.credibility })
-      await delay(isRogue ? 1800 : 1000)
-    }
-
-    setPhase('tee')
-    emitMap('tee')
-    onActivity({ type: 'system', message: 'TEE unavailable — local allocation' })
-    await delay(3000)
-
-    setPhase('allocating')
-    const totalWeight = scored.reduce((s, a) => s + a.weight, 0)
-    const newAllocations: Allocation[] = scored.map(s => ({
-      agent: s.ensName, ensName: s.ensName,
-      amount: BigInt(Math.floor(Number(fundPool) * (totalWeight > 0 ? s.weight / totalWeight : 0))),
-      disasterId: disasters[0]?.id || 'sim', timestamp: Date.now(),
-      assessmentHash: `0x${Math.random().toString(16).slice(2, 18)}`, teeVerified: false,
-    }))
-    const allocShares: Record<string, number> = {}
-    const totalAmount = newAllocations.reduce((s, a) => s + a.amount, 0n)
-    newAllocations.forEach(a => { allocShares[a.ensName] = totalAmount > 0n ? Number(a.amount) / Number(totalAmount) : 0 })
-
-    for (const alloc of newAllocations) {
-      if (cancelledRef.current) return
-      const pct = ((Number(alloc.amount) / Number(fundPool)) * 100).toFixed(1)
-      const isRogue = agents.find(a => a.ensName === alloc.ensName)?.role === 'adversary'
-      emitMap('allocating', alloc.ensName, allocShares)
-      onActivity({ type: 'allocation', agent: alloc.ensName, message: `${alloc.ensName}: ${pct}%${isRogue ? ' (gated)' : ''}` })
-      await delay(1200)
-    }
-    onAllocations(newAllocations)
-    const totalAllocated = newAllocations.reduce((s, a) => s + a.amount, 0n)
-    onFundUpdate(fundPool - totalAllocated, totalAllocated)
-
-    setPhase('storage')
-    emitMap('storage', undefined, allocShares)
-    onActivity({ type: 'system', message: '0G Storage — audit log committed locally' })
-    await delay(2000)
-
-    setPhase('ens_write')
-    for (const s of scored) {
-      if (cancelledRef.current) return
-      emitMap('ens_write', s.ensName, allocShares)
-      onActivity({ type: 'system', message: `ENS updated — ${s.ensName.split('.')[0]} credibility → ${s.credibility}/1000` })
-      await delay(800)
-    }
-
-    onActivity({ type: 'system', message: `Cycle ${cycleNumber} complete` })
-  }
-
   const runCycle = async () => {
     if (running || disasters.length === 0) return
     setRunning(true)
+    setError('')
     cancelledRef.current = false
-    try { await runCycleLive() } catch { await runCycleOffline() }
+    try {
+      setPhase('collecting')
+      emitMap('collecting')
+      emitMsg('coordinator.responsesurface.eth', `Initiating allocation cycle ${cycleNumber}`, 'COLLECT', 'report')
+      const res = await fetch('/api/cycle/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cycleNumber }),
+      })
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+      const result: CycleResult = await res.json()
+
+      const allocShares: Record<string, number> = {}
+      result.allocations.forEach(a => { allocShares[a.ensName] = a.share })
+
+      await playBackEvents(result.events, allocShares)
+      for (const a of result.assessments) onAgentUpdate(a.agentEns, { credibilityScore: a.credibility })
+      const newAllocations: Allocation[] = result.allocations.map(a => ({
+        agent: a.ensName, ensName: a.ensName, amount: BigInt(a.amount),
+        disasterId: a.disasterId, timestamp: a.timestamp,
+        assessmentHash: a.assessmentHash, teeVerified: a.teeVerified,
+      }))
+      onAllocations(newAllocations)
+      const totalAllocated = result.totalAllocated ? BigInt(result.totalAllocated) : newAllocations.reduce((s, a) => s + a.amount, 0n)
+      const balance = result.fundBalance ? BigInt(result.fundBalance) : 0n
+      onFundUpdate(balance > 0n ? balance : 0n, totalAllocated)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Cycle failed: ${msg}`)
+      onActivity({ type: 'system', message: `Cycle ${cycleNumber} failed — ${msg}` })
+      emitMsg('coordinator.responsesurface.eth', `Cycle failed: ${msg}`, 'COLLECT', 'alert')
+    }
     emitMap('complete')
     await delay(2000)
     emitMap('idle')
     onCycleAdvance()
     setPhase('')
-    setMode('')
     setRunning(false)
   }
 
@@ -262,13 +209,19 @@ export default function CycleSimulator({
             })}
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-[6px] h-[6px] rounded-full ${mode === 'live' ? 'status-glow-normal' : ''}`}
-              style={{ background: mode === 'live' ? 'var(--status-normal)' : 'var(--status-serious)' }} />
+            <div className="w-[6px] h-[6px] rounded-full status-glow-normal"
+              style={{ background: 'var(--status-normal)' }} />
             <span className="text-[10px] font-medium text-[var(--color-text-secondary)]">
               {PHASES[activeIdx]?.label}
             </span>
-            {mode === 'offline' && <span className="text-[9px] ml-auto font-[var(--font-mono)]" style={{ color: 'var(--status-serious)' }}>LOCAL</span>}
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-3 px-3 py-2 rounded-[var(--radius)] text-[10px] leading-relaxed"
+          style={{ background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)', color: 'var(--status-critical)' }}>
+          {error}
         </div>
       )}
 

@@ -52,6 +52,10 @@ body {
   outline: none;
 }
 
+.mapboxgl-marker {
+  position: absolute !important;
+}
+
 /* Tabular numbers for all data */
 .tabular { font-variant-numeric: tabular-nums; }
 

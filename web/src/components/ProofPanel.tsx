@@ -77,6 +77,15 @@ async function hashFile(file: File): Promise<string> {
   return '0x' + Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+const SAMPLE_EVIDENCE = [
+  { file: 'wildfire_01.webp', label: 'Wildfire', coords: [-121.3, 39.8] as [number, number] },
+  { file: 'wildfire_02.webp', label: 'Fire aftermath', coords: [-118.1, 34.2] as [number, number] },
+  { file: 'flood_01.webp', label: 'Flood rescue', coords: [-90.2, 32.4] as [number, number] },
+  { file: 'flood_02.webp', label: 'River overflow', coords: [-89.5, 33.1] as [number, number] },
+  { file: 'storm_01.webp', label: 'Storm damage', coords: [-76.3, 36.8] as [number, number] },
+  { file: 'storm_02.webp', label: 'Hurricane debris', coords: [-81.2, 26.5] as [number, number] },
+]
+
 export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofPanelProps) {
   const [step, setStep] = useState<Step>('idle')
   const [coords, setCoords] = useState<[number, number] | null>(null)
@@ -126,9 +135,64 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
     await new Promise(r => setTimeout(r, 600))
     const simProof: Proof = {
       responderEns: 'responder.responsesurface.eth',
-      agentEns: 'fire.responsesurface.eth',
+      agentEns: 'pacific.responsesurface.eth',
       location: { type: 'Point', coordinates: finalCoords },
       credibilityScore: 650,
+      disasterId: 'sim-proof',
+      timestamp: Date.now(),
+      proofHash: hash,
+    }
+    setResult({ success: true, proof: simProof, message: 'Proof recorded (API offline — simulated)' })
+    setStep('done')
+    onProofSubmitted(simProof)
+  }, [onProofSubmitted])
+
+  const handleSample = useCallback(async (sample: typeof SAMPLE_EVIDENCE[0]) => {
+    setCoords(sample.coords)
+    const res = await fetch(`/images/evidence/${sample.file}`)
+    const blob = await res.blob()
+    const file = new File([blob], sample.file, { type: 'image/webp' })
+    setFileName(sample.label)
+    setPreview(URL.createObjectURL(file))
+    setError('')
+    setResult(null)
+
+    setStep('extracting')
+    await new Promise(r => setTimeout(r, 400))
+
+    setStep('hashing')
+    const hash = await hashFile(file)
+    setPhotoHash(hash)
+
+    setStep('attesting')
+    try {
+      const apiRes = await fetch('/api/proofs/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          responderEns: 'responder.responsesurface.eth',
+          location: { type: 'Point', coordinates: sample.coords },
+          photoHash: hash,
+        }),
+      })
+      if (apiRes.ok) {
+        const data = await apiRes.json()
+        setStep('done')
+        setResult(data)
+        onProofSubmitted(data.proof)
+        return
+      }
+    } catch {}
+
+    setStep('checking')
+    await new Promise(r => setTimeout(r, 600))
+    const regions = ['pacific', 'mountain', 'central', 'lakes', 'delta', 'gulf', 'atlantic', 'northeast']
+    const agentEns = `${regions[Math.floor(Math.random() * regions.length)]}.responsesurface.eth`
+    const simProof: Proof = {
+      responderEns: 'responder.responsesurface.eth',
+      agentEns,
+      location: { type: 'Point', coordinates: sample.coords },
+      credibilityScore: 600 + Math.floor(Math.random() * 300),
       disasterId: 'sim-proof',
       timestamp: Date.now(),
       proofHash: hash,
@@ -190,6 +254,28 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
               </div>
             )}
           </div>
+
+          {/* Sample evidence gallery */}
+          {step === 'idle' && (
+            <div>
+              <div className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--color-text-placeholder)' }}>
+                Sample field evidence
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {SAMPLE_EVIDENCE.map(s => (
+                  <button
+                    key={s.file}
+                    onClick={() => handleSample(s)}
+                    className="relative rounded-[var(--radius)] overflow-hidden cursor-pointer group border border-[var(--border-default)] hover:border-[var(--color-interactive-muted)] transition-colors"
+                  >
+                    <img src={`/images/evidence/${s.file}`} alt={s.label} className="w-full h-16 object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-70 group-hover:opacity-90 transition-opacity" />
+                    <span className="absolute bottom-1 left-1.5 text-[9px] text-white font-medium">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Pipeline */}
           {step !== 'idle' && (
