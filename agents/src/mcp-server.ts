@@ -631,7 +631,8 @@ app.post('/api/cycle/run', async (req, res) => {
       `${shortName(a.agentEns)}: credibility ${credibility}/1000${isRogue ? ' — no verified proofs' : ''}`,
       a.agentEns,
     )
-    return { ...a, credibility, weight: credibility * a.severity }
+    const disasterDensity = 1 + a.disasters.length * 0.4
+    return { ...a, credibility, weight: credibility * a.severity * disasterDensity }
   })
 
   // Phase 4: 0G Compute sealed inference
@@ -646,7 +647,7 @@ app.post('/api/cycle/run', async (req, res) => {
       teeVerified = plan.teeVerified
       emit('system', `0G Compute — allocation plan verified in TEE enclave`)
     } catch (e) {
-      emit('system', `0G Compute — TEE unavailable, using local credibility weighting`)
+      emit('system', `0G Compute — TEE offline, using local credibility weighting`)
     }
   } else {
     emit('system', `0G Compute — TEE not configured, using local credibility weighting`)
@@ -673,9 +674,11 @@ app.post('/api/cycle/run', async (req, res) => {
   }
   const totalWeight = scored.reduce((s, a) => s + a.weight, 0)
 
+  const SCALE = 1_000_000_000n
   const allocations = scored.map(s => {
     const share = totalWeight > 0 ? s.weight / totalWeight : 0
-    const amount = BigInt(Math.floor(Number(fundPool) * share))
+    const scaledShare = BigInt(Math.round(share * 1_000_000_000))
+    const amount = (fundPool * scaledShare) / SCALE
     return {
       ensName: s.agentEns,
       amount: amount.toString(),
@@ -688,6 +691,12 @@ app.post('/api/cycle/run', async (req, res) => {
       share,
     }
   })
+  const allocTotal = allocations.reduce((s, a) => s + BigInt(a.amount), 0n)
+  if (allocTotal > fundPool && allocations.length > 0) {
+    const excess = allocTotal - fundPool
+    const largest = allocations.reduce((mi, a, i) => BigInt(allocations[mi].amount) >= BigInt(a.amount) ? mi : i, 0)
+    allocations[largest].amount = (BigInt(allocations[largest].amount) - excess).toString()
+  }
 
   for (const alloc of allocations) {
     const pct = (alloc.share * 100).toFixed(1)

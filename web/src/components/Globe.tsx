@@ -576,14 +576,14 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
 
-    agents.forEach(agent => {
+    agents.filter(a => a.role !== 'coordinator').forEach(agent => {
       const color = agentColor(agent)
       const name = agent.ensName.replace('.responsesurface.eth', '')
       const isFlagged = agent.status === 'flagged'
       const credColor = credibilityColor(agent.credibilityScore)
       const credPct = (agent.credibilityScore ?? 0) / 1000
 
-      const iconSize = 22
+      const iconSize = 28
       const ringSize = iconSize + 10 + Math.round(credPct * 8)
 
       const el = document.createElement('div')
@@ -608,8 +608,18 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       iconWrapper.style.height = `${iconSize}px`
       iconWrapper.style.top = `${(ringSize - iconSize) / 2}px`
       iconWrapper.style.left = `${(ringSize - iconSize) / 2}px`
+      iconWrapper.style.borderRadius = '50%'
+      iconWrapper.style.overflow = 'hidden'
       iconWrapper.style.filter = `drop-shadow(0 0 4px ${color}80)`
-      iconWrapper.innerHTML = agentIconSvg(name, color, iconSize)
+
+      const img = document.createElement('img')
+      img.src = `/images/agents/${name}.webp`
+      img.style.width = '100%'
+      img.style.height = '100%'
+      img.style.objectFit = 'cover'
+      img.style.borderRadius = '50%'
+      img.onerror = () => { iconWrapper.innerHTML = agentIconSvg(name, color, iconSize) }
+      iconWrapper.appendChild(img)
       el.appendChild(iconWrapper)
 
       if (isFlagged) {
@@ -650,9 +660,8 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       markersRef.current.push(marker)
     })
 
-    // Bioregion polygon fills
     const bioregionFeatures = agents
-      .filter(a => BIOREGION_POLYGONS[a.ensName])
+      .filter(a => a.role !== 'coordinator' && BIOREGION_POLYGONS[a.ensName])
       .map(a => ({
         type: 'Feature' as const,
         properties: { color: agentColor(a), name: a.ensName },

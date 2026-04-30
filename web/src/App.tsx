@@ -2,9 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import Header from './components/Header'
 import Globe from './components/Globe'
 import FundPanel from './components/FundPanel'
-import AgentPanel from './components/AgentPanel'
-import ActivityFeed from './components/ActivityFeed'
-import AgentMessageLog from './components/AgentMessageLog'
 import CycleSimulator from './components/CycleSimulator'
 import ArchitecturePanel from './components/ArchitecturePanel'
 import MeshPanel from './components/MeshPanel'
@@ -50,17 +47,31 @@ const AGENT_COLORS: Record<string, string> = {
 }
 
 const AGENT_DESCRIPTIONS: Record<string, string> = {
-  pacific: 'Pacific Coast — EONET, FIRMS, GBIF, AirNow',
-  mountain: 'Rocky Mountains — EONET, FIRMS, GBIF',
-  central: 'Central Plains — EONET, FIRMS, GBIF',
-  lakes: 'Great Lakes — EONET, USGS, GBIF, iNaturalist',
-  delta: 'Mississippi Delta — EONET, USGS, GBIF, iNaturalist',
-  gulf: 'Gulf Coast — EONET, FIRMS, USGS',
-  atlantic: 'Atlantic Seaboard — EONET, USGS, GBIF',
-  northeast: 'Northeast — EONET, USGS, GBIF',
-  coordinator: 'Aggregates assessments, 0G TEE sealed inference',
+  pacific: 'EONET, FIRMS, GBIF, AirNow',
+  mountain: 'EONET, FIRMS, GBIF',
+  central: 'EONET, FIRMS, GBIF',
+  lakes: 'EONET, USGS, GBIF, iNaturalist',
+  delta: 'EONET, USGS, GBIF, iNaturalist',
+  gulf: 'EONET, FIRMS, USGS',
+  atlantic: 'EONET, USGS, GBIF',
+  northeast: 'EONET, USGS, GBIF',
+  coordinator: '0G TEE sealed inference',
   rogue: 'Adversarial — inflated severity, 0 proofs',
   phantom: 'Adversarial — fabricated Midwest data',
+}
+
+const REGION_LABELS: Record<string, string> = {
+  pacific: 'Pacific Coast',
+  mountain: 'Rocky Mountains',
+  central: 'Central Plains',
+  lakes: 'Great Lakes',
+  delta: 'Mississippi Delta',
+  gulf: 'Gulf Coast',
+  atlantic: 'Atlantic Seaboard',
+  northeast: 'Northeast',
+  coordinator: 'Coordinator',
+  rogue: 'Global',
+  phantom: 'Midwest',
 }
 
 function credColor(score: number): string {
@@ -77,12 +88,28 @@ function credLabel(score: number): string {
   return 'NORMAL'
 }
 
+function timeAgo(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  return `${Math.floor(s / 3600)}h`
+}
+
+const TYPE_CONFIG: Record<ActivityEvent['type'], { dot: string; text: string }> = {
+  disaster: { dot: 'var(--status-critical)', text: 'var(--status-critical)' },
+  assessment: { dot: 'var(--status-standby)', text: 'var(--color-text-secondary)' },
+  proof: { dot: 'var(--status-normal)', text: 'var(--color-text-secondary)' },
+  allocation: { dot: 'var(--status-serious)', text: 'var(--color-text-secondary)' },
+  flag: { dot: 'var(--status-critical)', text: 'var(--status-critical)' },
+  system: { dot: 'var(--status-off)', text: 'var(--color-text-placeholder)' },
+}
+
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>(FALLBACK_AGENTS)
   const [disasters, setDisasters] = useState<Disaster[]>([])
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [proofs, setProofs] = useState<Proof[]>([])
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
   const [fundBalance, setFundBalance] = useState(10000000000000000000n)
   const [fundAllocated, setFundAllocated] = useState(0n)
   const [cycleNumber, setCycleNumber] = useState(1)
@@ -91,14 +118,12 @@ export default function App() {
   const [showMesh, setShowMesh] = useState(false)
   const [showProofs, setShowProofs] = useState(false)
   const [showENS, setShowENS] = useState(false)
-  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'activity' | 'comms'>('dashboard')
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
   const [messages, setMessages] = useState<AgentMessage[]>([])
 
   const addMessage = useCallback((msg: AgentMessage) => {
     setMessages(prev => {
       if (msg.phase === 'COLLECT' && msg.content.includes('Initiating')) {
-        setSidebarTab('comms')
         return [msg]
       }
       return [...prev, msg]
@@ -135,9 +160,6 @@ export default function App() {
         }))
         setAgents(mapped)
         addActivity({ type: 'system', message: `Loaded ${mapped.length} agents from registry` })
-        mapped.filter(a => a.status === 'flagged').forEach(a => {
-          addActivity({ type: 'flag', agent: a.ensName, message: `${a.ensName} flagged — credibility ${a.credibilityScore ?? '?'}/1000` })
-        })
       })
       .catch(() => {
         addActivity({ type: 'system', message: 'API unavailable — using fallback agent data' })
@@ -151,7 +173,6 @@ export default function App() {
         setFundAllocated(BigInt(data.totalAllocated || '0'))
         setCycleNumber(data.cycleNumber || 1)
         if (data.allocations?.length) setAllocations(data.allocations)
-        addActivity({ type: 'system', message: `Fund state loaded — cycle ${data.cycleNumber || 1}` })
       })
       .catch(() => {})
   }, [addActivity])
@@ -179,14 +200,12 @@ export default function App() {
           })
         setDisasters(mapped)
         addActivity({ type: 'disaster', message: `${mapped.length} active disasters from NASA EONET` })
-        mapped.slice(0, 3).forEach(d => {
-          addActivity({ type: 'disaster', message: `Tracking: ${d.title}` })
-        })
       })
       .catch(() => {})
   }, [addActivity])
 
-  const hasRunCycle = activities.some(a => a.type === 'allocation')
+  const visibleAgents = agents.filter(a => a.role !== 'coordinator')
+  const formatEth = (wei: bigint) => (Math.max(0, Number(wei) / 1e18)).toFixed(0)
 
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-base)]">
@@ -198,22 +217,20 @@ export default function App() {
       />
 
       <div className="flex-1 flex min-h-0 relative">
-        {/* Map — full bleed */}
         <div className="flex-1 relative">
           <Globe
             agents={agents}
             disasters={disasters}
             allocations={allocations}
             proofs={proofs}
-            selectedAgent={selectedAgent}
-            onAgentClick={setSelectedAgent}
+            selectedAgent={expandedAgent}
+            onAgentClick={(name) => setExpandedAgent(prev => prev === name ? null : name)}
             cycleMapState={cycleMapState}
           />
         </div>
 
-        {/* Sidebar — FIRMS pattern: semi-transparent, heavy shadow, one-sided radius */}
         <aside
-          className="w-[570px] flex flex-col overflow-hidden shrink-0 z-10"
+          className="w-[520px] flex flex-col overflow-hidden shrink-0 z-10"
           style={{
             background: 'rgba(27, 45, 62, 0.92)',
             backdropFilter: 'blur(12px)',
@@ -221,226 +238,200 @@ export default function App() {
             borderLeft: '1px solid var(--border-default)',
           }}
         >
-          {/* Tab bar — Astro section band */}
-          <div className="flex bg-[var(--color-header)] shrink-0">
-            <button
-              onClick={() => setSidebarTab('dashboard')}
-              className={`flex-1 py-2.5 text-[11px] font-medium tracking-wider uppercase transition-colors cursor-pointer border-b-2 ${
-                sidebarTab === 'dashboard'
-                  ? 'text-[var(--color-interactive)] border-[var(--color-interactive)]'
-                  : 'text-[var(--color-text-placeholder)] border-transparent hover:text-[var(--color-text-secondary)]'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setSidebarTab('comms')}
-              className={`flex-1 py-2.5 text-[11px] font-medium tracking-wider uppercase transition-colors cursor-pointer border-b-2 relative ${
-                sidebarTab === 'comms'
-                  ? 'text-[var(--color-interactive)] border-[var(--color-interactive)]'
-                  : 'text-[var(--color-text-placeholder)] border-transparent hover:text-[var(--color-text-secondary)]'
-              }`}
-            >
-              Comms
-              {messages.length > 0 && sidebarTab !== 'comms' && (
-                <span className="ml-1 text-[9px] tabular" style={{ color: 'var(--viz-3)' }}>
-                  {messages.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setSidebarTab('activity')}
-              className={`flex-1 py-2.5 text-[11px] font-medium tracking-wider uppercase transition-colors cursor-pointer border-b-2 relative ${
-                sidebarTab === 'activity'
-                  ? 'text-[var(--color-interactive)] border-[var(--color-interactive)]'
-                  : 'text-[var(--color-text-placeholder)] border-transparent hover:text-[var(--color-text-secondary)]'
-              }`}
-            >
-              Activity
-              {activities.length > 0 && sidebarTab !== 'activity' && (
-                <span className="ml-1 text-[9px] tabular" style={{ color: 'var(--status-standby)' }}>
-                  {activities.length}
-                </span>
-              )}
-            </button>
-          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            {/* ═══ AGENTS ═══ */}
+            <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} />
 
-          <div className="flex-1 overflow-y-auto">
-            {sidebarTab === 'dashboard' ? (
-              <>
-                {/* System description */}
-                <div className="px-4 py-3 border-b border-[var(--border-default)]">
-                  <p className="text-[13px] font-medium text-[var(--color-text)] leading-snug">
-                    Verifiable disaster response coordination
-                  </p>
-                  <p className="text-[11px] text-[var(--color-text-placeholder)] leading-relaxed mt-1.5">
-                    AI agents monitor regions via government APIs. Sealed inference allocates funds weighted by onchain credibility.
-                  </p>
-
-                  {/* Pipeline — connected steps */}
-                  <div className="mt-3 flex items-center">
-                    {[
-                      { label: 'Detect', color: 'var(--status-critical)' },
-                      { label: 'Mesh', color: 'var(--viz-3)' },
-                      { label: 'ENS', color: 'var(--status-standby)' },
-                      { label: 'TEE', color: 'var(--status-serious)' },
-                      { label: 'Fund', color: 'var(--status-normal)' },
-                      { label: 'Audit', color: 'var(--status-serious)' },
-                    ].map((s, i) => (
-                      <div key={i} className="flex items-center flex-1">
-                        <span
-                          className="text-[9px] font-medium tracking-wider uppercase px-1"
-                          style={{ color: s.color }}
+            <div className="px-2 py-1.5 space-y-px">
+              {visibleAgents.map(agent => {
+                const name = agent.ensName.replace('.responsesurface.eth', '')
+                const color = AGENT_COLORS[name] || 'var(--status-off)'
+                const cred = agent.credibilityScore ?? 0
+                const isFlagged = agent.status === 'flagged'
+                const isExpanded = expandedAgent === agent.ensName
+                return (
+                  <div key={agent.ensName}>
+                    <div
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 cursor-pointer transition-colors rounded-[var(--radius)] ${isExpanded ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'}`}
+                      style={{ borderLeft: `3px solid ${color}` }}
+                      onClick={() => setExpandedAgent(isExpanded ? null : agent.ensName)}
+                    >
+                      <div className="relative shrink-0 w-[26px] h-[26px]">
+                        <div
+                          className="w-full h-full rounded-full flex items-center justify-center text-[10px] font-bold uppercase"
+                          style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `1.5px solid ${color}` }}
                         >
-                          {s.label}
-                        </span>
-                        {i < 5 && <div className="flex-1 h-px" style={{ background: `${s.color}` , opacity: 0.25 }} />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Section band — Agents */}
-                <SectionBand label="Agents" right={`${agents.filter(a => a.status === 'active').length}/${agents.length} online`} />
-
-                <div className="px-3 py-2 space-y-1">
-                  {agents.map(agent => {
-                    const name = agent.ensName.replace('.responsesurface.eth', '')
-                    const color = AGENT_COLORS[name] || 'var(--status-off)'
-                    const cred = agent.credibilityScore ?? 0
-                    const isFlagged = agent.status === 'flagged'
-                    return (
-                      <div
-                        key={agent.ensName}
-                        className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors rounded-[var(--radius)] hover:bg-[var(--color-hover)]"
-                        style={{ borderLeft: `3px solid ${color}` }}
-                        onClick={() => setSelectedAgent(agent.ensName)}
-                      >
-                        {/* Agent avatar with letter fallback */}
-                        <div className="relative shrink-0 w-[28px] h-[28px]">
-                          <div
-                            className="w-full h-full rounded-full flex items-center justify-center text-[11px] font-bold uppercase"
-                            style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `1.5px solid ${color}` }}
-                          >
-                            {name[0]}
-                          </div>
-                          <img
-                            src={`/images/agents/${name}.webp`}
-                            alt=""
-                            className="absolute inset-0 w-full h-full rounded-full object-cover border"
-                            style={{ borderColor: color }}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                          <div
-                            className={`absolute -bottom-px -right-px w-[8px] h-[8px] rounded-full border border-[var(--color-surface)] ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
-                            style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
-                          />
+                          {name[0]}
                         </div>
+                        <img
+                          src={`/images/agents/${name}.webp`}
+                          alt=""
+                          className="absolute inset-0 w-full h-full rounded-full object-cover border"
+                          style={{ borderColor: color }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                        <div
+                          className={`absolute -bottom-px -right-px w-[7px] h-[7px] rounded-full border border-[var(--color-surface)] ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
+                          style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
+                        />
+                      </div>
 
-                        {/* Name + desc */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[12px] font-medium text-[var(--color-text)]">{name}</span>
-                            <span
-                              className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium"
-                              style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}
-                            >
-                              {agent.role}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-[var(--color-text)]">{name}</span>
+                          <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium"
+                            style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
+                            {agent.role}
+                          </span>
+                          {isFlagged && (
+                            <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
+                              flagged
                             </span>
-                            {isFlagged && (
-                              <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
-                                flagged
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-[var(--color-text-placeholder)] mt-px truncate">
-                            {AGENT_DESCRIPTIONS[name]}
-                          </div>
+                          )}
                         </div>
-
-                        {/* Credibility — large mono number */}
-                        <div className="text-right shrink-0">
-                          <div
-                            className="text-[16px] font-medium font-[var(--font-mono)] tabular leading-none"
-                            style={{ color: credColor(cred) }}
-                          >
-                            {cred}
-                          </div>
-                          <div className="text-[8px] uppercase tracking-wider mt-0.5" style={{ color: credColor(cred), opacity: 0.7 }}>
-                            {credLabel(cred)}
-                          </div>
+                        <div className="text-[9px] text-[var(--color-text-placeholder)] mt-px truncate">
+                          {REGION_LABELS[name]} — {AGENT_DESCRIPTIONS[name]}
                         </div>
                       </div>
-                    )
-                  })}
+
+                      <div className="text-right shrink-0">
+                        <div className="text-[14px] font-medium font-[var(--font-mono)] tabular leading-none"
+                          style={{ color: credColor(cred) }}>
+                          {cred}
+                        </div>
+                        <div className="text-[7px] uppercase tracking-wider mt-0.5" style={{ color: credColor(cred), opacity: 0.7 }}>
+                          {credLabel(cred)}
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-[var(--color-text-placeholder)] shrink-0">
+                        {isExpanded ? '▾' : '▸'}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="ml-[18px] pl-3 border-l-2 mb-1 mt-0.5 space-y-2 py-2" style={{ borderColor: color }}>
+                        {/* Credibility bar */}
+                        <div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[22px] font-light font-[var(--font-mono)] tabular leading-none" style={{ color: credColor(cred) }}>
+                              {cred}
+                            </span>
+                            <span className="text-[10px] text-[var(--color-text-placeholder)]">/1000</span>
+                          </div>
+                          <div className="mt-1.5 h-[3px] bg-[var(--border-default)] rounded-[1px] overflow-hidden">
+                            <div className="h-full rounded-[1px] transition-all duration-700"
+                              style={{ width: `${(cred / 1000) * 100}%`, background: credColor(cred) }} />
+                          </div>
+                        </div>
+
+                        {isFlagged && (
+                          <div className="px-2 py-1.5 rounded-[var(--radius)] text-[9px] leading-relaxed"
+                            style={{ background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)', color: 'var(--status-critical)' }}>
+                            Credibility below threshold — allocations reduced by proof multiplier
+                          </div>
+                        )}
+
+                        {/* Data Sources */}
+                        <div>
+                          <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Data Sources</div>
+                          <div className="flex flex-wrap gap-1">
+                            {agent.dataSources.map(ds => (
+                              <span key={ds} className="px-1.5 py-px rounded-[var(--radius)] text-[9px] font-medium text-[var(--color-text-secondary)] bg-[var(--color-header)] border border-[var(--border-default)]">
+                                {ds}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Region */}
+                        <div>
+                          <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Region</div>
+                          <code className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] bg-[var(--color-header)] px-1.5 py-0.5 rounded-[var(--radius)] block border border-[var(--border-default)]">
+                            [{agent.bioregion.bbox.west.toFixed(1)}, {agent.bioregion.bbox.south.toFixed(1)}] → [{agent.bioregion.bbox.east.toFixed(1)}, {agent.bioregion.bbox.north.toFixed(1)}]
+                          </code>
+                        </div>
+
+                        {/* ENS */}
+                        <a
+                          href={`https://app.ens.domains/${agent.ensName}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-[var(--font-mono)] hover:underline block"
+                          style={{ color: 'var(--color-interactive)' }}
+                        >
+                          {agent.ensName} ↗
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* ═══ FUND + CYCLE ═══ */}
+            <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
+
+            <div className="px-4 py-3">
+              {/* Compact fund summary */}
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <span className="text-[22px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
+                    {formatEth(fundBalance)}
+                  </span>
+                  <span className="text-[10px] text-[var(--color-text-placeholder)] ml-1.5">fUSD</span>
                 </div>
-
-                {/* Section band — Fund */}
-                <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
-
-                <div className="px-4 py-3">
-                  <FundPanel
-                    balance={fundBalance}
-                    totalAllocated={fundAllocated}
-                    allocations={allocations}
-                    cycleNumber={cycleNumber}
-                  />
-                </div>
-
-                {/* Section band — Cycle */}
-                <SectionBand label="Allocation Cycle" />
-
-                <div className="px-4 py-3">
-                  <CycleSimulator
-                    agents={agents}
-                    disasters={disasters}
-                    cycleNumber={cycleNumber}
-                    onActivity={addActivity}
-                    onAllocations={setAllocations}
-                    onCycleAdvance={() => setCycleNumber(n => n + 1)}
-                    onAgentUpdate={handleAgentUpdate}
-                    onFundUpdate={(balance, allocated) => {
-                      setFundBalance(balance)
-                      setFundAllocated(allocated)
-                    }}
-                    onMapState={setCycleMapState}
-                    onMessage={addMessage}
-                  />
-                  {disasters.length === 0 && (
-                    <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
-                      Loading disaster data from NASA EONET...
-                    </p>
-                  )}
-                  {disasters.length > 0 && !hasRunCycle && (
-                    <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
-                      {disasters.length} active disasters. Run a cycle to execute the full pipeline.
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : sidebarTab === 'comms' ? (
-              <div className="px-3 py-2">
-                <AgentMessageLog messages={messages} />
+                <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">
+                  {formatEth(fundAllocated)} allocated
+                </span>
               </div>
-            ) : (
-              <div className="px-3 py-2">
-                <ActivityFeed events={activities} />
+
+              {/* Allocation bar (when allocations exist) */}
+              {allocations.length > 0 && (
+                <FundPanel
+                  balance={fundBalance}
+                  totalAllocated={fundAllocated}
+                  allocations={allocations}
+                  cycleNumber={cycleNumber}
+                />
+              )}
+
+              <div className="mt-3">
+                <CycleSimulator
+                  agents={agents}
+                  disasters={disasters}
+                  cycleNumber={cycleNumber}
+                  onActivity={addActivity}
+                  onAllocations={setAllocations}
+                  onCycleAdvance={() => setCycleNumber(n => n + 1)}
+                  onAgentUpdate={handleAgentUpdate}
+                  onFundUpdate={(balance, allocated) => {
+                    setFundBalance(balance)
+                    setFundAllocated(allocated)
+                  }}
+                  onMapState={setCycleMapState}
+                  onMessage={addMessage}
+                />
               </div>
-            )}
+
+              {disasters.length === 0 && (
+                <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
+                  Loading disaster data from NASA EONET...
+                </p>
+              )}
+            </div>
+
+            {/* ═══ LIVE FEED ═══ */}
+            <SectionBand label="Live Feed" right={`${activities.length + messages.length} events`} />
+
+            <div className="px-2 py-1.5">
+              <LiveFeed activities={activities} messages={messages} />
+            </div>
           </div>
         </aside>
       </div>
 
-      {/* Detail panels */}
-      {selectedAgent && (
-        <AgentPanel
-          ensName={selectedAgent}
-          agent={agents.find(a => a.ensName === selectedAgent)!}
-          textRecords={{}}
-          proofs={proofs.filter(p => p.agentEns === selectedAgent)}
-          onClose={() => setSelectedAgent(null)}
-        />
-      )}
+      {/* Modal panels */}
       {showArchitecture && <ArchitecturePanel onClose={() => setShowArchitecture(false)} />}
       {showMesh && <MeshPanel onClose={() => setShowMesh(false)} />}
       {showENS && <ENSPanel agents={agents} onClose={() => setShowENS(false)} />}
@@ -463,6 +454,86 @@ function SectionBand({ label, right }: { label: string; right?: string }) {
     <div className="px-4 py-1.5 bg-[var(--color-header)] flex items-center justify-between border-y border-[var(--border-default)]">
       <span className="text-[10px] font-medium text-[var(--color-text-placeholder)] uppercase tracking-wider">{label}</span>
       {right && <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">{right}</span>}
+    </div>
+  )
+}
+
+interface LiveFeedProps {
+  activities: ActivityEvent[]
+  messages: AgentMessage[]
+}
+
+const MSG_COLORS: Record<string, string> = {
+  pacific: '#f97316', mountain: '#ef4444', central: '#f59e0b', lakes: '#3b82f6',
+  delta: '#06b6d4', gulf: '#8b5cf6', atlantic: '#10b981', northeast: '#6366f1',
+  coordinator: '#ffb302', rogue: '#ff3838', phantom: '#ff3838',
+}
+
+function LiveFeed({ activities, messages }: LiveFeedProps) {
+  type FeedItem = { ts: number; kind: 'activity'; data: ActivityEvent } | { ts: number; kind: 'msg'; data: AgentMessage }
+
+  const items: FeedItem[] = [
+    ...activities.map(a => ({ ts: a.timestamp, kind: 'activity' as const, data: a })),
+    ...messages.map(m => ({ ts: m.timestamp, kind: 'msg' as const, data: m })),
+  ].sort((a, b) => b.ts - a.ts).slice(0, 60)
+
+  if (items.length === 0) {
+    return <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-6">Run a cycle to see live events</div>
+  }
+
+  return (
+    <div className="space-y-px">
+      {items.map((item, i) => {
+        if (item.kind === 'activity') {
+          const event = item.data
+          const cfg = TYPE_CONFIG[event.type]
+          return (
+            <div key={`a-${event.id}`} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+              <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: cfg.dot }} />
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
+                  {event.message}
+                </span>
+                {event.links && event.links.length > 0 && (
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                    {event.links.map((link, j) => (
+                      <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+                        className="text-[9px] font-[var(--font-mono)] hover:underline"
+                        style={{ color: 'var(--color-interactive)' }}>
+                        {link.label} ↗
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+                {timeAgo(event.timestamp)}
+              </span>
+            </div>
+          )
+        } else {
+          const msg = item.data
+          const sender = msg.sender.replace('.responsesurface.eth', '')
+          const senderColor = MSG_COLORS[sender] || 'var(--viz-2)'
+          return (
+            <div key={`m-${msg.id}`} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors font-[var(--font-mono)]">
+              <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: senderColor }} />
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px]">
+                  <span className="font-medium" style={{ color: senderColor }}>{sender}</span>
+                  {msg.receiver && (
+                    <span style={{ color: 'var(--color-text-placeholder)' }}> → {msg.receiver.replace('.responsesurface.eth', '')}</span>
+                  )}
+                  <span className="text-[var(--color-text-secondary)] ml-1">{msg.content}</span>
+                </span>
+              </div>
+              <span className="text-[9px] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+                {timeAgo(msg.timestamp)}
+              </span>
+            </div>
+          )
+        }
+      })}
     </div>
   )
 }
