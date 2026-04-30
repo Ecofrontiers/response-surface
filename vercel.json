@@ -1,0 +1,7 @@
+{
+  "outputDirectory": "web/dist",
+  "buildCommand": "cd web && npm install && npx vite build",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "http://46.225.135.67:3001/api/:path*" }
+  ]
+}
