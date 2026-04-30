@@ -990,29 +990,33 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 17.7,13 2.3,13" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-400">Wildfire / volcano — live NASA EONET</span>
+          <span className="text-gray-400">Wildfire / volcano — NASA EONET</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 16,10 10,17 4,10" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-400">Flood / storm — live NASA EONET</span>
+          <span className="text-gray-400">Flood / storm — NASA EONET</span>
         </div>
         <div className="flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 20 20" className="shrink-0">
-            <path d="M10 2C10 2 5 8 5 12C5 15.3 7.2 18 10 18C12.8 18 15 15.3 15 12C15 8 10 2 10 2Z" fill="#f97316" stroke="white" strokeWidth="1.2"/>
-          </svg>
-          <span className="text-gray-400">Agent — icon by type, ring = credibility score</span>
+          <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#22c55e]" style={{ background: 'linear-gradient(135deg, #f97316, #3b82f6)' }} />
+          <span className="text-gray-400">Agent — avatar photo, ring = credibility</span>
         </div>
         <div className="flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 20 20" className="shrink-0">
-            <path d="M10 2L18 17H2L10 2Z" fill="#ef4444" stroke="white" strokeWidth="1.2"/>
-          </svg>
+          <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#ef4444]" style={{ background: '#ef444440', animation: 'pulse-ring 1.5s ease-in-out infinite' }} />
           <span className="text-gray-400">Flagged adversarial agent</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
-          <span className="text-gray-400">Monitoring region boundary</span>
+          <span className="text-gray-400">Monitoring region</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-[2px] shrink-0" style={{ background: '#a78bfa' }} />
+          <span className="text-gray-400">AXL mesh relay</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-[2px] shrink-0" style={{ background: '#4ade80' }} />
+          <span className="text-gray-400">Fund allocation flow</span>
         </div>
       </div>
     </>
