@@ -689,6 +689,9 @@ app.post('/api/cycle/run', async (req, res) => {
       credibility: s.credibility,
       severity: s.severity,
       share,
+      disasterCount: s.disasters.length,
+      proofDensity: s.proofDensity,
+      weight: s.weight,
     }
   })
   const allocTotal = allocations.reduce((s, a) => s + BigInt(a.amount), 0n)

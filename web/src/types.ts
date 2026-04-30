@@ -27,6 +27,12 @@ export interface Allocation {
   timestamp: number
   assessmentHash: string
   teeVerified: boolean
+  credibility?: number
+  severity?: number
+  disasterCount?: number
+  proofDensity?: number
+  weight?: number
+  share?: number
 }
 
 export interface Proof {

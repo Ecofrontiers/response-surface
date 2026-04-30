@@ -27,7 +27,7 @@ interface CycleResult {
   cycleNumber: number
   events: BackendEvent[]
   assessments: { agentEns: string; severity: number; proofDensity: number; credibility: number; disasterCount: number; speciesAtRisk: number }[]
-  allocations: { ensName: string; amount: string; disasterId: string; timestamp: number; assessmentHash: string; teeVerified: boolean; credibility: number; share: number }[]
+  allocations: { ensName: string; amount: string; disasterId: string; timestamp: number; assessmentHash: string; teeVerified: boolean; credibility: number; share: number; disasterCount?: number; proofDensity?: number; weight?: number; severity?: number }[]
   teeVerified: boolean
   axlOnline: boolean
   ensGateActive: boolean
@@ -170,6 +170,9 @@ export default function CycleSimulator({
         agent: a.ensName, ensName: a.ensName, amount: BigInt(a.amount),
         disasterId: a.disasterId, timestamp: a.timestamp,
         assessmentHash: a.assessmentHash, teeVerified: a.teeVerified,
+        credibility: a.credibility, severity: a.severity,
+        disasterCount: a.disasterCount, proofDensity: a.proofDensity,
+        weight: a.weight, share: a.share,
       }))
       onAllocations(newAllocations)
       const totalAllocated = result.totalAllocated ? BigInt(result.totalAllocated) : newAllocations.reduce((s, a) => s + a.amount, 0n)

@@ -168,7 +168,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: 'mapbox://styles/mapbox/light-v11',
       center: [-97, 39],
       zoom: 3.3,
       projection: 'mercator',
@@ -178,9 +178,9 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
 
     map.on('style.load', () => {
       map.setFog({
-        color: '#0a0e17',
-        'high-color': '#111827',
-        'horizon-blend': 0.1,
+        color: '#f8fafc',
+        'high-color': '#e2e8f0',
+        'horizon-blend': 0.08,
       })
     })
 
@@ -403,10 +403,10 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         new mapboxgl.Popup({ closeButton: false, maxWidth: '260px' })
           .setLngLat(e.lngLat)
           .setHTML(`
-            <div style="font-family:Inter,sans-serif;font-size:12px;color:#e5e7eb;background:#1f2937;padding:8px 12px;border-radius:6px;border:1px solid #ef444440">
+            <div style="font-family:Inter,sans-serif;font-size:12px;color:#1e293b;background:#ffffff;padding:8px 12px;border-radius:6px;border:1px solid #ef444440;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
               <div style="font-weight:600;color:#ef4444">${props.title}</div>
-              <div style="margin-top:2px;opacity:0.7">${props.category}</div>
-              <div style="margin-top:4px;font-size:10px;color:#9ca3af">Severity: ${props.severity}/10 · NASA EONET</div>
+              <div style="margin-top:2px;color:#64748b">${props.category}</div>
+              <div style="margin-top:4px;font-size:10px;color:#94a3b8">Severity: ${props.severity}/10 · NASA EONET</div>
             </div>
           `)
           .addTo(map)
@@ -698,9 +698,9 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
 
       const popup = new mapboxgl.Popup({ offset: ringSize / 2 + 4, closeButton: false })
         .setHTML(`
-          <div style="font-family:Inter,sans-serif;font-size:12px;color:#e5e7eb;background:#1f2937;padding:10px 14px;border-radius:8px;border:1px solid ${color}40;min-width:180px">
+          <div style="font-family:Inter,sans-serif;font-size:12px;color:#1e293b;background:#ffffff;padding:10px 14px;border-radius:8px;border:1px solid ${color}40;min-width:180px;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
             <div style="font-weight:600;color:${color}">${agent.ensName}</div>
-            <div style="margin-top:2px;opacity:0.7">${agent.role}${isFlagged ? ' — FLAGGED' : ''}</div>
+            <div style="margin-top:2px;color:#64748b">${agent.role}${isFlagged ? ' — FLAGGED' : ''}</div>
             ${credLabel}
             <div style="margin-top:6px;display:flex;gap:3px;flex-wrap:wrap">${dataSrcPills}</div>
           </div>
@@ -984,39 +984,39 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       `}</style>
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
       {/* Map legend */}
-      <div className="absolute bottom-4 left-4 z-10 bg-[#0d1117]/90 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 text-[10px] space-y-1.5">
+      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-sm border border-black/10 rounded-xl px-4 py-3 text-[10px] space-y-1.5 shadow-lg">
         <div className="text-[9px] text-gray-500 uppercase tracking-wider font-medium mb-2">Map Key</div>
         <div className="flex items-center gap-2">
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 17.7,13 2.3,13" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-400">Wildfire / volcano — NASA EONET</span>
+          <span className="text-gray-600">Wildfire / volcano — NASA EONET</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 16,10 10,17 4,10" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-400">Flood / storm — NASA EONET</span>
+          <span className="text-gray-600">Flood / storm — NASA EONET</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#22c55e]" style={{ background: 'linear-gradient(135deg, #f97316, #3b82f6)' }} />
-          <span className="text-gray-400">Agent — avatar photo, ring = credibility</span>
+          <span className="text-gray-600">Agent — avatar photo, ring = credibility</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#ef4444]" style={{ background: '#ef444440', animation: 'pulse-ring 1.5s ease-in-out infinite' }} />
-          <span className="text-gray-400">Flagged adversarial agent</span>
+          <span className="text-gray-600">Flagged adversarial agent</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
-          <span className="text-gray-400">Monitoring region</span>
+          <span className="text-gray-600">Monitoring region</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-[2px] shrink-0" style={{ background: '#a78bfa' }} />
-          <span className="text-gray-400">AXL mesh relay</span>
+          <span className="text-gray-600">AXL mesh relay</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-[2px] shrink-0" style={{ background: '#4ade80' }} />
-          <span className="text-gray-400">Fund allocation flow</span>
+          <span className="text-gray-600">Fund allocation flow</span>
         </div>
       </div>
     </>

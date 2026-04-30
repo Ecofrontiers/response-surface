@@ -25,17 +25,31 @@ interface MeshPanelProps {
 }
 
 const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
-  coordinator: { x: 200, y: 80 },
-  fire: { x: 80, y: 220 },
-  water: { x: 320, y: 220 },
-  rogue: { x: 200, y: 300 },
+  coordinator: { x: 300, y: 60 },
+  pacific: { x: 80, y: 140 },
+  mountain: { x: 180, y: 140 },
+  central: { x: 280, y: 140 },
+  lakes: { x: 380, y: 140 },
+  delta: { x: 480, y: 140 },
+  gulf: { x: 130, y: 240 },
+  atlantic: { x: 280, y: 240 },
+  northeast: { x: 430, y: 240 },
+  rogue: { x: 180, y: 330 },
+  phantom: { x: 400, y: 330 },
 }
 
 const NODE_COLORS: Record<string, string> = {
   coordinator: '#f59e0b',
-  fire: '#f97316',
-  water: '#3b82f6',
+  pacific: '#f97316',
+  mountain: '#ef4444',
+  central: '#f59e0b',
+  lakes: '#3b82f6',
+  delta: '#06b6d4',
+  gulf: '#8b5cf6',
+  atlantic: '#10b981',
+  northeast: '#6366f1',
   rogue: '#ef4444',
+  phantom: '#ef4444',
 }
 
 export default function MeshPanel({ onClose }: MeshPanelProps) {
@@ -45,16 +59,25 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
 
   useEffect(() => {
     const fallbackNodes: MeshNode[] = [
-      { name: 'coordinator', port: 9022, online: false, peerId: '', peerCount: 0, connectedTo: [] },
-      { name: 'pacific', port: 9002, online: false, peerId: '', peerCount: 0, connectedTo: [] },
-      { name: 'mountain', port: 9012, online: false, peerId: '', peerCount: 0, connectedTo: [] },
-      { name: 'lakes', port: 9032, online: false, peerId: '', peerCount: 0, connectedTo: [] },
-      { name: 'rogue', port: 9082, online: false, peerId: '', peerCount: 0, connectedTo: [] },
+      { name: 'coordinator', port: 9022, online: false, peerId: 'ed25519:coord-5a1b', peerCount: 10, connectedTo: [] },
+      { name: 'pacific', port: 9002, online: false, peerId: 'ed25519:pac-8f3a', peerCount: 2, connectedTo: [] },
+      { name: 'mountain', port: 9004, online: false, peerId: 'ed25519:mtn-2c7d', peerCount: 2, connectedTo: [] },
+      { name: 'central', port: 9006, online: false, peerId: 'ed25519:cnt-4e9f', peerCount: 2, connectedTo: [] },
+      { name: 'lakes', port: 9008, online: false, peerId: 'ed25519:lak-1a2b', peerCount: 2, connectedTo: [] },
+      { name: 'delta', port: 9010, online: false, peerId: 'ed25519:del-3c4d', peerCount: 2, connectedTo: [] },
+      { name: 'gulf', port: 9012, online: false, peerId: 'ed25519:glf-5e6f', peerCount: 2, connectedTo: [] },
+      { name: 'atlantic', port: 9014, online: false, peerId: 'ed25519:atl-7g8h', peerCount: 2, connectedTo: [] },
+      { name: 'northeast', port: 9016, online: false, peerId: 'ed25519:ne-9i0j', peerCount: 2, connectedTo: [] },
+      { name: 'rogue', port: 9082, online: false, peerId: 'ed25519:rog-k1l2', peerCount: 1, connectedTo: [] },
+      { name: 'phantom', port: 9084, online: false, peerId: 'ed25519:phn-m3n4', peerCount: 1, connectedTo: [] },
     ]
     const fallbackDiscovery: DiscoveredAgent[] = [
-      { peerId: '', card: { name: 'pacific.responsesurface.eth', description: 'Pacific Coast agent', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
-      { peerId: '', card: { name: 'lakes.responsesurface.eth', description: 'Great Lakes agent', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
-      { peerId: '', card: { name: 'rogue.responsesurface.eth', description: 'Adversarial agent — global', capabilities: ['assessment'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:pac-8f3a', card: { name: 'pacific.responsesurface.eth', description: 'Pacific Coast — EONET, FIRMS, GBIF, AirNow', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:mtn-2c7d', card: { name: 'mountain.responsesurface.eth', description: 'Rocky Mountains — EONET, FIRMS, GBIF', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:lak-1a2b', card: { name: 'lakes.responsesurface.eth', description: 'Great Lakes — EONET, USGS, GBIF, iNaturalist', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:del-3c4d', card: { name: 'delta.responsesurface.eth', description: 'Mississippi Delta — EONET, USGS, GBIF', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:glf-5e6f', card: { name: 'gulf.responsesurface.eth', description: 'Gulf Coast — EONET, FIRMS, USGS', capabilities: ['assessment', 'proof-collection'], services: ['assessment'] }, status: 'offline' },
+      { peerId: 'ed25519:rog-k1l2', card: { name: 'rogue.responsesurface.eth', description: 'Adversarial — inflated severity, 0 proofs', capabilities: ['assessment'], services: ['assessment'] }, status: 'offline' },
     ]
 
     Promise.all([
@@ -72,37 +95,37 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[720px] max-h-[85vh] bg-[var(--bg-secondary)]/95 backdrop-blur-xl border border-[var(--border-medium)] rounded-2xl overflow-y-auto scrollbar-thin"
+        className="w-[720px] max-h-[85vh] bg-[var(--color-surface)] backdrop-blur-xl border border-[var(--border-default)] rounded-[var(--radius)] overflow-y-auto scrollbar-thin"
         onClick={e => e.stopPropagation()}
       >
-        <div className="h-1 bg-gradient-to-r from-[var(--accent-mesh)] via-[var(--accent-ens)] to-[var(--accent-mesh)]" />
-        <div className="sticky top-0 bg-[var(--bg-secondary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between">
+        <div className="h-1 bg-gradient-to-r from-[var(--viz-3)] via-[var(--status-standby)] to-[var(--viz-3)]" />
+        <div className="sticky top-0 bg-[var(--color-header)] border-b border-[var(--border-default)] px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">AXL Mesh Network</h2>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <h2 className="text-lg font-semibold text-[var(--color-text)]">AXL Mesh Network</h2>
+            <p className="text-[11px] text-[var(--color-text-placeholder)] mt-0.5">
               Ed25519-authenticated P2P agent communication via Gensyn AXL
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl cursor-pointer leading-none">&times;</button>
+          <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] text-xl cursor-pointer leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-6">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${onlineCount === nodes.length && onlineCount > 0 ? 'bg-emerald-400 animate-pulse' : onlineCount > 0 ? 'bg-amber-400' : 'bg-red-400'}`} />
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-[var(--color-text-placeholder)]">
                 {loading ? 'Connecting...' : `${onlineCount}/${nodes.length || 4} nodes online`}
               </span>
             </div>
-            <div className="text-[10px] text-gray-600 font-[var(--font-mono)]">
+            <div className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)]">
               Protocol: AXL / Ed25519
             </div>
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Mesh Topology</h3>
-            <div className="relative bg-black/30 rounded-xl border border-white/5 overflow-hidden" style={{ height: 360 }}>
-              <svg width="100%" height="100%" viewBox="0 0 400 360">
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Mesh Topology</h3>
+            <div className="relative bg-[var(--color-base)] rounded-[var(--radius)] border border-[var(--border-default)] overflow-hidden" style={{ height: 380 }}>
+              <svg width="100%" height="100%" viewBox="0 0 560 380">
                 {nodes.length > 0 && nodes.map(node => {
                   const pos = NODE_POSITIONS[node.name]
                   if (!pos) return null
@@ -125,13 +148,17 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                   })
                 })}
 
-                {nodes.length === 0 && [
-                  ['fire', 'coordinator'], ['water', 'coordinator'], ['rogue', 'coordinator'],
-                  ['fire', 'water'], ['fire', 'rogue'],
+                {(nodes.length === 0 || nodes.every(n => n.connectedTo.length === 0)) && [
+                  ['pacific', 'coordinator'], ['mountain', 'coordinator'], ['central', 'coordinator'],
+                  ['lakes', 'coordinator'], ['delta', 'coordinator'], ['gulf', 'coordinator'],
+                  ['atlantic', 'coordinator'], ['northeast', 'coordinator'],
+                  ['rogue', 'coordinator'], ['phantom', 'coordinator'],
+                  ['pacific', 'mountain'], ['central', 'lakes'], ['gulf', 'atlantic'],
                 ].map(([a, b]) => {
                   const posA = NODE_POSITIONS[a]
                   const posB = NODE_POSITIONS[b]
-                  const isRogue = a === 'rogue' || b === 'rogue'
+                  if (!posA || !posB) return null
+                  const isRogue = a === 'rogue' || b === 'rogue' || a === 'phantom' || b === 'phantom'
                   return (
                     <line
                       key={`sim-${a}-${b}`}
@@ -147,12 +174,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                   )
                 })}
 
-                {(nodes.length > 0 ? nodes : [
-                  { name: 'coordinator', online: true, peerId: 'ed25519:5a1b3c7d', peerCount: 3 },
-                  { name: 'fire', online: true, peerId: 'ed25519:8f3a2b7c', peerCount: 3 },
-                  { name: 'water', online: true, peerId: 'ed25519:2c7d4e9f', peerCount: 2 },
-                  { name: 'rogue', online: true, peerId: 'ed25519:9e0f1a2b', peerCount: 2 },
-                ] as MeshNode[]).map(node => {
+                {nodes.map(node => {
                   const pos = NODE_POSITIONS[node.name]
                   if (!pos) return null
                   const color = NODE_COLORS[node.name] || '#6b7280'
@@ -184,15 +206,15 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">A2A Discovery</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">A2A Discovery</h3>
             <div className="space-y-2">
               {discovered.map((d, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.02]">
+                <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border-default)] bg-[var(--color-header)]">
                   <div className={`w-2 h-2 rounded-full mt-1.5 ${d.status === 'discovered' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-white">{d.card?.name || 'Unknown'}</span>
-                      <span className="text-[10px] text-gray-600 font-[var(--font-mono)]">{d.peerId.slice(0, 20)}...</span>
+                      <span className="text-xs font-medium text-[var(--color-text)]">{d.card?.name || 'Unknown'}</span>
+                      <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)]">{d.peerId.slice(0, 20)}...</span>
                       <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded ${
                         d.status === 'discovered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : 'bg-red-500/10 text-red-400 border border-red-500/20'
@@ -202,7 +224,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                     </div>
                     {d.card && (
                       <>
-                        <p className="text-[10px] text-gray-500 mt-1">{d.card.description}</p>
+                        <p className="text-[10px] text-[var(--color-text-placeholder)] mt-1">{d.card.description}</p>
                         <div className="flex gap-1.5 mt-1.5">
                           {d.card.capabilities.map((cap, j) => (
                             <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
@@ -212,7 +234,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                         </div>
                         {d.card.services.length > 0 && (
                           <div className="flex gap-1.5 mt-1">
-                            <span className="text-[9px] text-gray-600">MCP services:</span>
+                            <span className="text-[9px] text-[var(--color-text-placeholder)]">MCP services:</span>
                             {d.card.services.map((svc, j) => (
                               <span key={j} className="text-[9px] text-cyan-400 font-[var(--font-mono)]">{svc}</span>
                             ))}
@@ -224,7 +246,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                 </div>
               ))}
               {discovered.length === 0 && !loading && (
-                <div className="text-[10px] text-gray-600 text-center py-4">
+                <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-4">
                   No peers discovered — AXL mesh offline
                 </div>
               )}
@@ -232,7 +254,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Coordinator Flow</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Coordinator Flow</h3>
             <div className="flex items-center gap-1 flex-wrap">
               {[
                 { step: '1', label: 'Discover peers', detail: 'AXL topology', color: '#8b5cf6' },
@@ -250,7 +272,7 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                     <span className="font-[var(--font-mono)] text-[9px] opacity-60">{s.step}</span>
                     <span className="font-medium">{s.label}</span>
                   </div>
-                  {i < 5 && <span className="text-gray-600 text-[10px]">&rarr;</span>}
+                  {i < 5 && <span className="text-[var(--color-text-placeholder)] text-[10px]">&rarr;</span>}
                 </div>
               ))}
             </div>

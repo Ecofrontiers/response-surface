@@ -40,6 +40,12 @@ function AllocationBar({ allocations }: { allocations: Allocation[] }) {
       color: AGENT_COLORS[agentShortName(a.ensName)] || 'var(--status-off)',
       share: Number(a.amount) / Number(total),
       amount: a.amount,
+      reasoning: a.credibility != null ? {
+        credibility: a.credibility!,
+        severity: a.severity ?? 0,
+        disasterCount: a.disasterCount ?? 0,
+        proofDensity: a.proofDensity ?? 0,
+      } : undefined,
     }))
     .sort((a, b) => b.share - a.share)
 
@@ -53,15 +59,25 @@ function AllocationBar({ allocations }: { allocations: Allocation[] }) {
       </div>
       <div className="mt-2 space-y-0.5">
         {slices.map((s, i) => (
-          <div key={i} className="flex items-center gap-2 text-[10px]">
-            <div className="w-[6px] h-[6px] rounded-[1px] shrink-0" style={{ background: s.color }} />
-            <span className="text-[var(--color-text-placeholder)] flex-1">{s.name}</span>
-            <span className="font-[var(--font-mono)] tabular text-[var(--color-text-secondary)]">
-              {(s.share * 100).toFixed(1)}%
-            </span>
-            <span className="font-[var(--font-mono)] tabular text-[var(--color-text-placeholder)] text-[9px] w-[52px] text-right">
-              {formatEth(s.amount)}
-            </span>
+          <div key={i}>
+            <div className="flex items-center gap-2 text-[10px]">
+              <div className="w-[6px] h-[6px] rounded-[1px] shrink-0" style={{ background: s.color }} />
+              <span className="text-[var(--color-text-placeholder)] flex-1">{s.name}</span>
+              <span className="font-[var(--font-mono)] tabular text-[var(--color-text-secondary)]">
+                {(s.share * 100).toFixed(1)}%
+              </span>
+              <span className="font-[var(--font-mono)] tabular text-[var(--color-text-placeholder)] text-[9px] w-[52px] text-right">
+                {formatEth(s.amount)}
+              </span>
+            </div>
+            {s.reasoning && (
+              <div className="ml-[14px] mt-px flex gap-2 text-[8px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">
+                <span>{s.reasoning.disasterCount} disasters</span>
+                <span>sev {s.reasoning.severity.toFixed(1)}</span>
+                <span>cred {s.reasoning.credibility}</span>
+                <span>proofs {s.reasoning.proofDensity.toFixed(1)}</span>
+              </div>
+            )}
           </div>
         ))}
       </div>

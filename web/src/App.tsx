@@ -120,6 +120,7 @@ export default function App() {
   const [showENS, setShowENS] = useState(false)
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
   const [messages, setMessages] = useState<AgentMessage[]>([])
+  const [sidebarTab, setSidebarTab] = useState<'feed' | 'comms'>('feed')
 
   const addMessage = useCallback((msg: AgentMessage) => {
     setMessages(prev => {
@@ -238,8 +239,8 @@ export default function App() {
             borderLeft: '1px solid var(--border-default)',
           }}
         >
-          <div className="flex-1 overflow-y-auto scrollbar-thin">
-            {/* ═══ AGENTS ═══ */}
+          {/* Top: scrollable agents + fund */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
             <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} />
 
             <div className="px-2 py-1.5 space-y-px">
@@ -311,7 +312,6 @@ export default function App() {
 
                     {isExpanded && (
                       <div className="ml-[18px] pl-3 border-l-2 mb-1 mt-0.5 space-y-2 py-2" style={{ borderColor: color }}>
-                        {/* Credibility bar */}
                         <div>
                           <div className="flex items-baseline gap-1">
                             <span className="text-[22px] font-light font-[var(--font-mono)] tabular leading-none" style={{ color: credColor(cred) }}>
@@ -332,7 +332,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Data Sources */}
                         <div>
                           <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Data Sources</div>
                           <div className="flex flex-wrap gap-1">
@@ -344,7 +343,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Region */}
                         <div>
                           <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Region</div>
                           <code className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] bg-[var(--color-header)] px-1.5 py-0.5 rounded-[var(--radius)] block border border-[var(--border-default)]">
@@ -352,7 +350,6 @@ export default function App() {
                           </code>
                         </div>
 
-                        {/* ENS */}
                         <a
                           href={`https://app.ens.domains/${agent.ensName}`}
                           target="_blank"
@@ -369,11 +366,9 @@ export default function App() {
               })}
             </div>
 
-            {/* ═══ FUND + CYCLE ═══ */}
             <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
 
             <div className="px-4 py-3">
-              {/* Compact fund summary */}
               <div className="flex items-baseline justify-between">
                 <div>
                   <span className="text-[22px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
@@ -386,7 +381,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Allocation bar (when allocations exist) */}
               {allocations.length > 0 && (
                 <FundPanel
                   balance={fundBalance}
@@ -420,12 +414,38 @@ export default function App() {
                 </p>
               )}
             </div>
+          </div>
 
-            {/* ═══ LIVE FEED ═══ */}
-            <SectionBand label="Live Feed" right={`${activities.length + messages.length} events`} />
-
-            <div className="px-2 py-1.5">
-              <LiveFeed activities={activities} messages={messages} />
+          {/* Bottom: tabbed Feed / Comms */}
+          <div className="shrink-0 flex flex-col" style={{ height: '35%', borderTop: '1px solid var(--border-default)' }}>
+            <div className="flex bg-[var(--color-header)]">
+              <button
+                className={`flex-1 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium transition-colors cursor-pointer ${
+                  sidebarTab === 'feed'
+                    ? 'text-[var(--color-interactive)] border-b-2 border-[var(--color-interactive)]'
+                    : 'text-[var(--color-text-placeholder)] hover:text-[var(--color-text-secondary)] border-b-2 border-transparent'
+                }`}
+                onClick={() => setSidebarTab('feed')}
+              >
+                Feed ({activities.length})
+              </button>
+              <button
+                className={`flex-1 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium transition-colors cursor-pointer ${
+                  sidebarTab === 'comms'
+                    ? 'text-[var(--color-interactive)] border-b-2 border-[var(--color-interactive)]'
+                    : 'text-[var(--color-text-placeholder)] hover:text-[var(--color-text-secondary)] border-b-2 border-transparent'
+                }`}
+                onClick={() => setSidebarTab('comms')}
+              >
+                Comms ({messages.length})
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-thin px-2 py-1.5">
+              {sidebarTab === 'feed' ? (
+                <ActivityFeed activities={activities} />
+              ) : (
+                <CommsFeed messages={messages} />
+              )}
             </div>
           </div>
         </aside>
@@ -458,81 +478,77 @@ function SectionBand({ label, right }: { label: string; right?: string }) {
   )
 }
 
-interface LiveFeedProps {
-  activities: ActivityEvent[]
-  messages: AgentMessage[]
-}
-
 const MSG_COLORS: Record<string, string> = {
   pacific: '#f97316', mountain: '#ef4444', central: '#f59e0b', lakes: '#3b82f6',
   delta: '#06b6d4', gulf: '#8b5cf6', atlantic: '#10b981', northeast: '#6366f1',
   coordinator: '#ffb302', rogue: '#ff3838', phantom: '#ff3838',
 }
 
-function LiveFeed({ activities, messages }: LiveFeedProps) {
-  type FeedItem = { ts: number; kind: 'activity'; data: ActivityEvent } | { ts: number; kind: 'msg'; data: AgentMessage }
-
-  const items: FeedItem[] = [
-    ...activities.map(a => ({ ts: a.timestamp, kind: 'activity' as const, data: a })),
-    ...messages.map(m => ({ ts: m.timestamp, kind: 'msg' as const, data: m })),
-  ].sort((a, b) => b.ts - a.ts).slice(0, 60)
-
-  if (items.length === 0) {
-    return <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-6">Run a cycle to see live events</div>
+function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
+  if (activities.length === 0) {
+    return <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-6">Run a cycle to see events</div>
   }
 
   return (
     <div className="space-y-px">
-      {items.map((item, i) => {
-        if (item.kind === 'activity') {
-          const event = item.data
-          const cfg = TYPE_CONFIG[event.type]
-          return (
-            <div key={`a-${event.id}`} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
-              <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: cfg.dot }} />
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
-                  {event.message}
-                </span>
-                {event.links && event.links.length > 0 && (
-                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-                    {event.links.map((link, j) => (
-                      <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
-                        className="text-[9px] font-[var(--font-mono)] hover:underline"
-                        style={{ color: 'var(--color-interactive)' }}>
-                        {link.label} ↗
-                      </a>
-                    ))}
-                  </div>
+      {activities.map(event => {
+        const cfg = TYPE_CONFIG[event.type]
+        return (
+          <div key={event.id} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: cfg.dot }} />
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
+                {event.message}
+              </span>
+              {event.links && event.links.length > 0 && (
+                <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                  {event.links.map((link, j) => (
+                    <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+                      className="text-[9px] font-[var(--font-mono)] hover:underline"
+                      style={{ color: 'var(--color-interactive)' }}>
+                      {link.label} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+              {timeAgo(event.timestamp)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CommsFeed({ messages }: { messages: AgentMessage[] }) {
+  if (messages.length === 0) {
+    return <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-6">Run a cycle to see agent communications</div>
+  }
+
+  return (
+    <div className="space-y-px">
+      {[...messages].reverse().map(msg => {
+        const sender = msg.sender.replace('.responsesurface.eth', '')
+        const senderColor = MSG_COLORS[sender] || 'var(--viz-2)'
+        return (
+          <div key={msg.id} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors font-[var(--font-mono)]">
+            <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: senderColor }} />
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px]">
+                <span className="font-medium" style={{ color: senderColor }}>{sender}</span>
+                {msg.receiver && (
+                  <span style={{ color: 'var(--color-text-placeholder)' }}> → {msg.receiver.replace('.responsesurface.eth', '')}</span>
                 )}
-              </div>
-              <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
-                {timeAgo(event.timestamp)}
+                <span className="text-[var(--color-text-secondary)] ml-1">{msg.content}</span>
               </span>
             </div>
-          )
-        } else {
-          const msg = item.data
-          const sender = msg.sender.replace('.responsesurface.eth', '')
-          const senderColor = MSG_COLORS[sender] || 'var(--viz-2)'
-          return (
-            <div key={`m-${msg.id}`} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors font-[var(--font-mono)]">
-              <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: senderColor }} />
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px]">
-                  <span className="font-medium" style={{ color: senderColor }}>{sender}</span>
-                  {msg.receiver && (
-                    <span style={{ color: 'var(--color-text-placeholder)' }}> → {msg.receiver.replace('.responsesurface.eth', '')}</span>
-                  )}
-                  <span className="text-[var(--color-text-secondary)] ml-1">{msg.content}</span>
-                </span>
-              </div>
-              <span className="text-[9px] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
-                {timeAgo(msg.timestamp)}
-              </span>
-            </div>
-          )
-        }
+            <span className="text-[9px] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+              {timeAgo(msg.timestamp)}
+            </span>
+          </div>
+        )
       })}
     </div>
   )

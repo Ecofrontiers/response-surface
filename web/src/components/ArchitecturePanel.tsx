@@ -67,23 +67,23 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[720px] max-h-[85vh] bg-[var(--bg-secondary)]/95 backdrop-blur-xl border border-[var(--border-medium)] rounded-2xl overflow-y-auto scrollbar-thin"
+        className="w-[720px] max-h-[85vh] bg-[var(--color-surface)] backdrop-blur-xl border border-[var(--border-default)] rounded-[var(--radius)] overflow-y-auto scrollbar-thin"
         onClick={e => e.stopPropagation()}
       >
-        <div className="h-1 bg-gradient-to-r from-[var(--accent-ember)] via-[var(--accent-amber)] to-[var(--accent-ember)]" />
-        <div className="sticky top-0 bg-[var(--bg-secondary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between">
+        <div className="h-1 bg-gradient-to-r from-[var(--status-serious)] via-[var(--status-caution)] to-[var(--status-serious)]" />
+        <div className="sticky top-0 bg-[var(--color-header)] border-b border-[var(--border-default)] px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">System Architecture</h2>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <h2 className="text-lg font-semibold text-[var(--color-text)]">System Architecture</h2>
+            <p className="text-[11px] text-[var(--color-text-placeholder)] mt-0.5">
               Credibility-weighted disaster response coordination on verifiable infrastructure
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl cursor-pointer leading-none">&times;</button>
+          <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] text-xl cursor-pointer leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-6">
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Trust Chain</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Trust Chain</h3>
             <div className="flex items-center gap-1">
               {TRUST_CHAIN.map((t, i) => (
                 <div key={i} className="flex items-center gap-1">
@@ -94,29 +94,29 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
                     <span className="font-[var(--font-mono)] text-[9px] opacity-70">{t.icon}</span>
                     <span>{t.label}</span>
                   </div>
-                  {i < TRUST_CHAIN.length - 1 && <span className="text-gray-600 text-[10px]">&rarr;</span>}
+                  {i < TRUST_CHAIN.length - 1 && <span className="text-[var(--color-text-placeholder)] text-[10px]">&rarr;</span>}
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Pipeline Layers</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Pipeline Layers</h3>
             <div className="space-y-2">
               {LAYERS.map((layer, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-3 p-3 rounded-xl border bg-white/[0.02]"
+                  className="flex items-start gap-3 p-3 rounded-xl border bg-[var(--color-header)]"
                   style={{ borderColor: `${layer.color}20` }}
                 >
                   <div className="flex flex-col items-center gap-1 pt-0.5">
                     <div className="w-2 h-2 rounded-full" style={{ background: layer.color }} />
-                    {i < LAYERS.length - 1 && <div className="w-px h-6 bg-white/10" />}
+                    {i < LAYERS.length - 1 && <div className="w-px h-6 bg-[var(--border-default)]" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium" style={{ color: layer.color }}>{layer.label}</span>
-                      <span className="text-[10px] text-gray-600 font-[var(--font-mono)]">{layer.tech}</span>
+                      <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)]">{layer.tech}</span>
                       {layer.sponsor && (
                         <span
                           className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-semibold"
@@ -126,7 +126,7 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{layer.desc}</p>
+                    <p className="text-[11px] text-[var(--color-text-placeholder)] mt-1 leading-relaxed">{layer.desc}</p>
                   </div>
                 </div>
               ))}
@@ -134,12 +134,12 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Adversarial Defense</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Adversarial Defense</h3>
             <div className="p-3 rounded-xl border border-red-500/20 bg-red-500/[0.03]">
-              <div className="text-[11px] text-gray-300 leading-relaxed">
+              <div className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
                 Credibility scores gate fund allocation. The proof multiplier penalizes unverified agents:
               </div>
-              <div className="mt-2 font-[var(--font-mono)] text-xs text-red-400 bg-black/30 rounded-lg px-3 py-2">
+              <div className="mt-2 font-[var(--font-mono)] text-xs text-red-400 bg-[var(--color-base)] rounded-lg px-3 py-2">
                 proofMultiplier = min(0.15 + proofCount * 0.28, 1.0)
               </div>
               <div className="mt-2 flex gap-4 text-[10px]">
@@ -150,7 +150,7 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Why Each Integration Is Load-Bearing</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Why Each Integration Is Load-Bearing</h3>
             <div className="grid grid-cols-2 gap-2">
               {[
                 { name: '0G', consequence: 'No verifiable allocation, no audit trail, no programmable disbursement' },
@@ -158,9 +158,9 @@ export default function ArchitecturePanel({ onClose }: ArchitecturePanelProps) {
                 { name: 'ENS', consequence: 'No identity, no credibility history, no allocation gating' },
                 { name: 'Astral', consequence: 'No ground-truth verification, coordinator trusts self-reported locations' },
               ].map((s, i) => (
-                <div key={i} className="p-2.5 rounded-lg border border-white/5 bg-white/[0.02]">
-                  <div className="text-[11px] font-medium text-white">{s.name}</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{s.consequence}</div>
+                <div key={i} className="p-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--color-header)]">
+                  <div className="text-[11px] font-medium text-[var(--color-text)]">{s.name}</div>
+                  <div className="text-[10px] text-[var(--color-text-placeholder)] mt-0.5">{s.consequence}</div>
                 </div>
               ))}
             </div>
