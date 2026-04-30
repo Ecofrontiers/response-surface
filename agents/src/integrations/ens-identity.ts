@@ -98,9 +98,14 @@ export async function getAgentMetadata(
     'description', 'bioregion.bounds', 'data.sources', 'axl.pubkey', 'role',
     '0g.address', 'credibility.score', 'credibility.proofs', 'credibility.lastUpdate',
   ]
+  const entries = await Promise.all(
+    keys.map(async key => {
+      const val = await getTextRecord(client, { name: ensName, key })
+      return [key, val] as const
+    })
+  )
   const results: Record<string, string> = {}
-  for (const key of keys) {
-    const val = await getTextRecord(client, { name: ensName, key })
+  for (const [key, val] of entries) {
     if (val) results[key] = val
   }
   return results

@@ -15,14 +15,14 @@ const LAYERS = [
     color: '#8b5cf6',
     tech: 'Gensyn AXL',
     desc: 'Encrypted P2P mesh. Coordinator discovers agents (A2A), tasks them (MCP), receives assessments. Ed25519-authenticated.',
-    sponsor: 'AXL $5,000',
+    sponsor: 'Gensyn AXL',
   },
   {
     label: 'Identity + Credibility',
     color: '#06b6d4',
     tech: 'ENS on Sepolia',
     desc: 'Each agent has an ENS subname. Credibility scores live in text records. Coordinator reads ENS before allocating — no identity, no funds.',
-    sponsor: 'ENS $5,000',
+    sponsor: 'ENS',
   },
   {
     label: 'Ground Truth',
@@ -36,21 +36,21 @@ const LAYERS = [
     color: '#f59e0b',
     tech: '0G Compute (TEE)',
     desc: 'Coordinator bundles all assessments + AXL pubkeys into a trusted enclave. Nobody — not even the operator — can rig the allocation.',
-    sponsor: '0G $7,500',
+    sponsor: '0G',
   },
   {
     label: 'Execution',
     color: '#f59e0b',
     tech: '0G Chain (fUSD)',
     desc: 'ResponseFund contract holds fUSD. Allocations transfer tokens to agents weighted by credibility. Every tx onchain.',
-    sponsor: '0G $7,500',
+    sponsor: '0G',
   },
   {
     label: 'Audit',
     color: '#f59e0b',
     tech: '0G Storage',
     desc: 'Every assessment, allocation, and proof hashed and stored immutably. Permanent, verifiable record.',
-    sponsor: '0G $7,500',
+    sponsor: '0G',
   },
 ]
 

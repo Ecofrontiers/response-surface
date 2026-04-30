@@ -6,9 +6,9 @@ Bioregional AI agents monitor real government data sources, relay assessments th
 
 ## How It Works
 
-Four agents run an allocation cycle every round:
+Eleven agents run an allocation cycle every round — 8 regional monitors covering the contiguous US, a coordinator, and 2 adversarial agents that stress-test the credibility gate:
 
-1. **Detection** — `fire.responsesurface.eth` monitors wildfires in California + Nevada via NASA EONET, FIRMS satellite hotspots, GBIF biodiversity, and EPA AirNow. `water.responsesurface.eth` monitors floods in the Lower Mississippi basin via USGS streamflow gauges, GBIF, and iNaturalist threatened species. `rogue.responsesurface.eth` submits inflated severity with zero verified proofs.
+1. **Detection** — Regional agents (`pacific`, `mountain`, `central`, `lakes`, `delta`, `gulf`, `atlantic`, `northeast`) each monitor their bioregion via NASA EONET, FIRMS, USGS, GBIF, AirNow, and iNaturalist. Adversarial agents (`rogue`, `phantom`) submit inflated severity with zero verified proofs.
 2. **Mesh** — Assessments relay through a Gensyn AXL P2P mesh with Ed25519 authentication. Each message is signed and verified.
 3. **Identity** — The coordinator reads ENS text records on Sepolia to gate participation. Credibility scores, proof counts, bioregion bounds, and AXL public keys are all stored as ENS text records under `responsesurface.eth`.
 4. **Compute** — Credibility-weighted allocation using the formula `proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)`. With 0G Compute TEE configured, inference runs in a sealed enclave.
@@ -22,10 +22,11 @@ Four agents run an allocation cycle every round:
 proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)
 ```
 
-Real allocation from a live cycle:
-- `water.responsesurface.eth` — credibility 1000/1000, 6 proofs → **70.5% of fund**
-- `fire.responsesurface.eth` — credibility 820/1000, 4 proofs → **23.1% of fund**
-- `rogue.responsesurface.eth` — credibility 101/1000, 0 proofs → **6.4% of fund** (severity 9, but crushed by credibility gate)
+Real allocation from a live cycle with 10 agents assessed:
+- High-credibility regional agents (lakes, delta, gulf, atlantic, central, mountain) — ~13.6% each
+- `northeast.responsesurface.eth` — 8.7%, `pacific.responsesurface.eth` — 7.2%
+- `rogue.responsesurface.eth` — 1.2% (severity 9, crushed by credibility gate)
+- `phantom.responsesurface.eth` — 1.2% (same pattern)
 
 Scores accumulate across rounds via ENS text records. History cannot be faked.
 
@@ -80,7 +81,7 @@ Everything is real and verifiable:
 
 | What | Where |
 |---|---|
-| Agent identities | [fire.responsesurface.eth](https://app.ens.domains/fire.responsesurface.eth) on ENS (Sepolia) |
+| Agent identities | [pacific.responsesurface.eth](https://app.ens.domains/pacific.responsesurface.eth) on ENS (Sepolia) |
 | Credibility scores | ENS text record `credibility.score` on each agent subname |
 | ResponseFund contract | [0x7e0D...a0](https://chainscan-galileo.0g.ai/address/0x7e0D9cf6045dd4ba622cd410a9F137a7A6d935a0) on 0G Explorer |
 | fUSD token | [0x6Cf1...A8](https://chainscan-galileo.0g.ai/address/0x6Cf1ed8721aB2B408d2a25797d6F71c9a17923A8) on 0G Explorer |
@@ -93,15 +94,6 @@ agents/      Node.js backend — MCP server, coordinator, government API integra
 web/         React + Mapbox globe with real bioregion boundaries
 axl/         Gensyn AXL node configurations (4 nodes)
 ```
-
-## Tracks
-
-| Track | Prize | Integration |
-|---|---|---|
-| 0G Autonomous Agents | $7,500 | 0G Compute (TEE inference) + Storage (audit Merkle roots) + Chain (fUSD allocation) |
-| Gensyn AXL | $5,000 | 4-node Ed25519 mesh, assessment relay, peer discovery |
-| ENS Best AI Agent | $2,500 | Credibility scores in text records gate fund allocation — remove ENS and the system breaks |
-| ENS Most Creative | $2,500 | ENSIP-25 registration + proof-weighted credibility that accumulates across cycles |
 
 ## Built With
 

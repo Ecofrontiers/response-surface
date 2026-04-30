@@ -1,0 +1,6 @@
+{
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "http://46.225.135.67/api/:path*" }
+  ]
+}

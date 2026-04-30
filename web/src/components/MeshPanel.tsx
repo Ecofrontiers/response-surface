@@ -188,14 +188,13 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
             <div className="space-y-2">
               {discovered.map((d, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.02]">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 ${d.status === 'discovered' ? 'bg-emerald-400' : d.status === 'simulated' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                  <div className={`w-2 h-2 rounded-full mt-1.5 ${d.status === 'discovered' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-white">{d.card?.name || 'Unknown'}</span>
                       <span className="text-[10px] text-gray-600 font-[var(--font-mono)]">{d.peerId.slice(0, 20)}...</span>
                       <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded ${
                         d.status === 'discovered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : d.status === 'simulated' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                         : 'bg-red-500/10 text-red-400 border border-red-500/20'
                       }`}>
                         {d.status}

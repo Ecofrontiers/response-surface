@@ -252,13 +252,13 @@ app.get('/api/axl/discovery', async (_req, res) => {
           card: {
             name: `${n.name}.responsesurface.eth`,
             description: `${n.name} bioregional agent`,
-            capabilities: n.name === 'rogue' ? ['assessment'] : ['assessment', 'proof-collection'],
+            capabilities: n.name === 'rogue' || n.name === 'phantom' ? ['assessment'] : ['assessment', 'proof-collection'],
             services: ['assessment'],
           },
-          status: 'simulated',
+          status: 'offline',
         })),
-      totalPeers: 3,
-      discoveredCount: 3,
+      totalPeers: 0,
+      discoveredCount: 0,
     })
   }
 })
@@ -653,17 +653,23 @@ app.post('/api/cycle/run', async (req, res) => {
   }
 
   // Phase 5: Build allocations — read real contract balance
-  let fundPool = 10000000000000000000n
-  if (process.env.RESPONSE_FUND_ADDRESS) {
-    try {
-      const readContract = createFundContractReadonly(process.env.RESPONSE_FUND_ADDRESS)
-      const state = await getFundState(readContract)
-      const realBalance = BigInt(state.balance)
-      if (realBalance > 0n) fundPool = realBalance
-      emit('system', `ResponseFund balance: ${fmtEth(state.balance)} fUSD available`)
-    } catch (e) {
-      emit('system', `ResponseFund balance read failed, using default pool: ${(e as Error).message}`)
+  let fundPool: bigint
+  if (!process.env.RESPONSE_FUND_ADDRESS) {
+    emit('system', `ResponseFund — no contract address configured, aborting allocation`)
+    return res.json({ cycleNumber, events, assessments, allocations: [], teeVerified, axlOnline: false, ensGateActive: true, ensUpdated: false, storageUploaded: false })
+  }
+  try {
+    const readContract = createFundContractReadonly(process.env.RESPONSE_FUND_ADDRESS)
+    const state = await getFundState(readContract)
+    fundPool = BigInt(state.balance)
+    if (fundPool === 0n) {
+      emit('system', `ResponseFund balance is 0 — nothing to allocate`)
+      return res.json({ cycleNumber, events, assessments, allocations: [], teeVerified, axlOnline: false, ensGateActive: true, ensUpdated: false, storageUploaded: false })
     }
+    emit('system', `ResponseFund balance: ${fmtEth(state.balance)} fUSD available`)
+  } catch (e) {
+    emit('system', `ResponseFund balance read failed — aborting allocation: ${(e as Error).message}`)
+    return res.json({ cycleNumber, events, assessments, allocations: [], teeVerified, axlOnline: false, ensGateActive: true, ensUpdated: false, storageUploaded: false })
   }
   const totalWeight = scored.reduce((s, a) => s + a.weight, 0)
 
@@ -698,14 +704,17 @@ app.post('/api/cycle/run', async (req, res) => {
   if (process.env.RESPONSE_FUND_ADDRESS && privateKey) {
     try {
       const fundContract = createFundContract(privateKey, process.env.RESPONSE_FUND_ADDRESS)
-      const onChainAllocations = allocations.map(a => ({
-        agent: ethers.computeAddress(privateKey as string),
-        amount: BigInt(a.amount),
-        ensName: a.ensName,
-        disasterId: a.disasterId,
-        assessmentHash: a.assessmentHash,
-        teeVerified: a.teeVerified,
-      }))
+      const onChainAllocations = allocations.map(a => {
+        const agentKey = ethers.keccak256(ethers.concat([ethers.getBytes(privateKey as string), ethers.toUtf8Bytes(a.ensName)]))
+        return {
+          agent: ethers.computeAddress(agentKey),
+          amount: BigInt(a.amount),
+          ensName: a.ensName,
+          disasterId: a.disasterId,
+          assessmentHash: a.assessmentHash,
+          teeVerified: a.teeVerified,
+        }
+      })
       const totalNeeded = onChainAllocations.reduce((s, a) => s + a.amount, 0n)
       if (totalNeeded > 0n) {
         const receipt = await execAllocations(fundContract, onChainAllocations)

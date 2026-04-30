@@ -131,20 +131,8 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
       }
     } catch {}
 
-    setStep('checking')
-    await new Promise(r => setTimeout(r, 600))
-    const simProof: Proof = {
-      responderEns: 'responder.responsesurface.eth',
-      agentEns: 'pacific.responsesurface.eth',
-      location: { type: 'Point', coordinates: finalCoords },
-      credibilityScore: 650,
-      disasterId: 'sim-proof',
-      timestamp: Date.now(),
-      proofHash: hash,
-    }
-    setResult({ success: true, proof: simProof, message: 'Proof recorded (API offline — simulated)' })
-    setStep('done')
-    onProofSubmitted(simProof)
+    setStep('idle')
+    setError('Proof submission failed — backend unavailable')
   }, [onProofSubmitted])
 
   const handleSample = useCallback(async (sample: typeof SAMPLE_EVIDENCE[0]) => {
@@ -184,22 +172,8 @@ export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofP
       }
     } catch {}
 
-    setStep('checking')
-    await new Promise(r => setTimeout(r, 600))
-    const regions = ['pacific', 'mountain', 'central', 'lakes', 'delta', 'gulf', 'atlantic', 'northeast']
-    const agentEns = `${regions[Math.floor(Math.random() * regions.length)]}.responsesurface.eth`
-    const simProof: Proof = {
-      responderEns: 'responder.responsesurface.eth',
-      agentEns,
-      location: { type: 'Point', coordinates: sample.coords },
-      credibilityScore: 600 + Math.floor(Math.random() * 300),
-      disasterId: 'sim-proof',
-      timestamp: Date.now(),
-      proofHash: hash,
-    }
-    setResult({ success: true, proof: simProof, message: 'Proof recorded (API offline — simulated)' })
-    setStep('done')
-    onProofSubmitted(simProof)
+    setStep('idle')
+    setError('Proof submission failed — backend unavailable')
   }, [onProofSubmitted])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
