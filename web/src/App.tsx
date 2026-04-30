@@ -158,10 +158,10 @@ export default function App() {
           dataSources: a.dataSources,
           axlPubkey: a.axlPubkey || '',
           status: a.status,
-          credibilityScore: a.credibility ?? a.credibilityScore,
+          credibilityScore: 0,
         }))
         setAgents(mapped)
-        addActivity({ type: 'system', message: `Loaded ${mapped.length} agents from registry` })
+        addActivity({ type: 'system', message: `${mapped.length} agents registered — credibility starts at 0, earned through cycles` })
       })
       .catch(() => {
         addActivity({ type: 'system', message: 'API unavailable — using fallback agent data' })

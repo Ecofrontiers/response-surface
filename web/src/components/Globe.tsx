@@ -777,7 +777,6 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         const [lng, lat] = (d.geometry as GeoJSON.Point).coordinates
         return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north
       })
-      if (inRegion.length === 0) continue
 
       const fires = inRegion.filter(d => d.category === 'wildfires' || d.category === 'fire' || d.category === 'volcanoes').length
       const floods = inRegion.filter(d => d.category === 'floods' || d.category === 'severeStorms').length
@@ -793,6 +792,10 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       if (quakes > 0) parts.push(`<span style="color:#f59e0b">${quakes} quake</span>`)
       if (other > 0) parts.push(`<span style="color:#6b7280">${other} other</span>`)
 
+      const statusLine = inRegion.length > 0
+        ? `${inRegion.length} events ${parts.join(' ')}`
+        : `<span style="color:#4b5563">monitoring &mdash; ${agent.dataSources.join(', ')}</span>`
+
       const el = document.createElement('div')
       el.innerHTML = `<div style="
         background: rgba(15,23,42,0.85);
@@ -807,7 +810,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         line-height: 1.3;
       ">
         <div style="color:${color};font-weight:600;font-size:8px;text-transform:uppercase;letter-spacing:0.5px">${name}</div>
-        <div style="color:#94a3b8">${inRegion.length} events ${parts.join(' ')}</div>
+        <div style="color:#94a3b8">${statusLine}</div>
       </div>`
 
       const marker = new mapboxgl.Marker({ element: el, anchor: 'top' })

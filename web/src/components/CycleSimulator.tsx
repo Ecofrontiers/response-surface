@@ -203,6 +203,37 @@ export default function CycleSimulator({
           }
         }
       }
+
+      // Adversarial agents ATTEMPT proofs that fail Astral verification
+      const ADVERSARIAL_ATTEMPTS: Record<string, { file: string; type: string; coords: [number, number]; zone: string; reason: string }> = {
+        'rogue.responsesurface.eth': { file: 'wildfire_02.webp', type: 'Fabricated wildfire', coords: [-150.0, 61.2], zone: 'Alaska (outside claimed region)', reason: 'Location 2,400km from nearest reported disaster' },
+        'phantom.responsesurface.eth': { file: 'flood_01.webp', type: 'Fabricated flood', coords: [-92.5, 40.0], zone: 'Iowa (no active flood)', reason: 'No corroborating data from USGS or EONET' },
+      }
+      for (const a of result.assessments) {
+        const attempt = ADVERSARIAL_ATTEMPTS[a.agentEns]
+        if (attempt) {
+          newProofs.push({
+            responderEns: a.agentEns,
+            agentEns: a.agentEns,
+            location: { type: 'Point', coordinates: attempt.coords },
+            credibilityScore: a.credibility,
+            disasterId: `cycle-${cycleNumber}`,
+            timestamp: Date.now(),
+            proofHash: `0x${crypto.randomUUID().replace(/-/g, '')}`,
+            astralVerified: false,
+            containment: { contained: false, zone: attempt.zone },
+            evidenceImage: attempt.file,
+            evidenceType: attempt.type,
+            proofDensity: 0,
+          })
+          onActivity({
+            type: 'flag',
+            agent: a.agentEns.replace('.responsesurface.eth', ''),
+            message: `REJECTED: ${a.agentEns.split('.')[0]} submitted proof from ${attempt.zone} — ${attempt.reason}`,
+          })
+        }
+      }
+
       if (newProofs.length > 0) onProofs?.(newProofs)
 
       const newAllocations: Allocation[] = result.allocations.map(a => ({
