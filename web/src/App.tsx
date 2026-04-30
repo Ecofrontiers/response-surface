@@ -75,6 +75,7 @@ const REGION_LABELS: Record<string, string> = {
 }
 
 function credColor(score: number): string {
+  if (score === 0) return 'var(--status-off)'
   if (score < 200) return 'var(--status-critical)'
   if (score < 500) return 'var(--status-serious)'
   if (score < 800) return 'var(--status-caution)'
@@ -82,6 +83,7 @@ function credColor(score: number): string {
 }
 
 function credLabel(score: number): string {
+  if (score === 0) return 'N/A'
   if (score < 200) return 'CRITICAL'
   if (score < 500) return 'SERIOUS'
   if (score < 800) return 'CAUTION'
@@ -342,7 +344,6 @@ export default function App() {
                       <div key={agent.ensName}>
                         <div
                           className={`flex items-center gap-2.5 px-2.5 py-1.5 cursor-pointer transition-colors rounded-[var(--radius)] ${isExpanded ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'}`}
-                          style={{ borderLeft: `3px solid ${color}` }}
                           onClick={() => setExpandedAgent(isExpanded ? null : agent.ensName)}
                         >
                           <div className="relative shrink-0 w-[26px] h-[26px]">
@@ -386,7 +387,7 @@ export default function App() {
                           <div className="text-right shrink-0">
                             <div className="text-[14px] font-medium font-[var(--font-mono)] tabular leading-none"
                               style={{ color: credColor(cred) }}>
-                              {cred}
+                              {cred === 0 ? '—' : cred}
                             </div>
                             <div className="text-[7px] uppercase tracking-wider mt-0.5" style={{ color: credColor(cred), opacity: 0.7 }}>
                               {credLabel(cred)}
