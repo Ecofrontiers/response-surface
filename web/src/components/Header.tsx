@@ -37,8 +37,8 @@ export default function Header({
 
     fetch('/api/axl/status')
       .then(r => r.json())
-      .then(data => setAxlStatus(data.status === 'connected' ? 'normal' : data.status === 'partial' ? 'caution' : 'off'))
-      .catch(() => setAxlStatus('off'))
+      .then(data => setAxlStatus(data.status === 'connected' ? 'normal' : data.status === 'partial' ? 'caution' : 'standby'))
+      .catch(() => setAxlStatus('standby'))
   }, [])
 
   return (
@@ -65,18 +65,32 @@ export default function Header({
           </div>
         </div>
 
-        <nav className="flex items-center gap-0.5">
+        <nav className="flex items-center gap-1.5">
           {[
-            { label: 'Architecture', onClick: onArchitectureClick },
-            { label: 'AXL Mesh', onClick: onMeshClick },
-            { label: 'ENS', onClick: onENSClick },
-            { label: 'Proofs', onClick: onProofsClick },
+            { label: 'Architecture', icon: '◇', color: '#f59e0b', onClick: onArchitectureClick },
+            { label: 'AXL Mesh', icon: '⬡', color: '#8b5cf6', onClick: onMeshClick },
+            { label: 'ENS', icon: '◈', color: '#06b6d4', onClick: onENSClick },
+            { label: 'Proofs', icon: '◉', color: '#22c55e', onClick: onProofsClick },
           ].map(btn => (
             <button
               key={btn.label}
               onClick={btn.onClick}
-              className="text-[11px] text-[var(--color-text-placeholder)] hover:text-[var(--color-interactive-hover)] transition-colors cursor-pointer px-3 py-1.5 rounded-[var(--radius)] hover:bg-[var(--color-hover)]"
+              className="text-[10px] font-medium tracking-wide cursor-pointer px-2.5 py-1 rounded-[var(--radius)] transition-all flex items-center gap-1.5 border"
+              style={{
+                color: btn.color,
+                borderColor: `color-mix(in srgb, ${btn.color} 30%, transparent)`,
+                background: `color-mix(in srgb, ${btn.color} 6%, transparent)`,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = `color-mix(in srgb, ${btn.color} 15%, transparent)`
+                e.currentTarget.style.borderColor = `color-mix(in srgb, ${btn.color} 50%, transparent)`
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = `color-mix(in srgb, ${btn.color} 6%, transparent)`
+                e.currentTarget.style.borderColor = `color-mix(in srgb, ${btn.color} 30%, transparent)`
+              }}
             >
+              <span className="text-[11px]">{btn.icon}</span>
               {btn.label}
             </button>
           ))}

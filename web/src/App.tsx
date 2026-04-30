@@ -110,7 +110,7 @@ export default function App() {
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [proofs, setProofs] = useState<Proof[]>([])
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
-  const [fundBalance, setFundBalance] = useState(10000000000000000000n)
+  const [fundBalance, setFundBalance] = useState(0n)
   const [fundAllocated, setFundAllocated] = useState(0n)
   const [cycleNumber, setCycleNumber] = useState(1)
   const [activities, setActivities] = useState<ActivityEvent[]>([])
@@ -120,7 +120,7 @@ export default function App() {
   const [showENS, setShowENS] = useState(false)
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
   const [messages, setMessages] = useState<AgentMessage[]>([])
-  const [sidebarTab, setSidebarTab] = useState<'feed' | 'comms'>('feed')
+  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'feed' | 'comms'>('dashboard')
 
   const addMessage = useCallback((msg: AgentMessage) => {
     setMessages(prev => {
@@ -169,8 +169,7 @@ export default function App() {
     fetch('/api/fund')
       .then(r => r.json())
       .then(data => {
-        const bal = BigInt(data.balance || '0')
-        if (bal > 0n) setFundBalance(bal)
+        setFundBalance(BigInt(data.balance || '0'))
         setFundAllocated(BigInt(data.totalAllocated || '0'))
         setCycleNumber(data.cycleNumber || 1)
         if (data.allocations?.length) setAllocations(data.allocations)
@@ -202,6 +201,29 @@ export default function App() {
         setDisasters(mapped)
         addActivity({ type: 'disaster', message: `${mapped.length} active disasters from NASA EONET` })
       })
+      .catch(() => {})
+
+    fetch('https://firms.modaps.eosdis.nasa.gov/api/area/csv/VIIRS_SNPP_NRT/-124,25,-67,49/1', { signal: AbortSignal.timeout(8000) })
+      .then(r => { if (r.ok) addActivity({ type: 'assessment', message: 'NASA FIRMS connected — VIIRS hotspot feed active' }) })
+      .catch(() => {})
+
+    fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson', { signal: AbortSignal.timeout(8000) })
+      .then(r => r.json())
+      .then(data => addActivity({ type: 'assessment', message: `USGS connected — ${data.features?.length || 0} seismic events (M2.5+)` }))
+      .catch(() => {})
+
+    fetch('https://api.gbif.org/v1/occurrence/search?country=US&limit=1', { signal: AbortSignal.timeout(8000) })
+      .then(r => r.json())
+      .then(data => addActivity({ type: 'assessment', message: `GBIF connected — ${(data.count || 0).toLocaleString()} US biodiversity records` }))
+      .catch(() => {})
+
+    fetch('https://www.airnowapi.org/aq/observation/zipCode/current/?format=application/json&zipCode=90210&distance=25&API_KEY=DEMO_KEY', { signal: AbortSignal.timeout(8000) })
+      .then(r => { if (r.ok) addActivity({ type: 'assessment', message: 'AirNow connected — real-time AQI monitoring active' }) })
+      .catch(() => {})
+
+    fetch('https://api.inaturalist.org/v1/observations?per_page=1&quality_grade=research&place_id=1', { signal: AbortSignal.timeout(8000) })
+      .then(r => r.json())
+      .then(data => addActivity({ type: 'assessment', message: `iNaturalist connected — ${(data.total_results || 0).toLocaleString()} research-grade observations` }))
       .catch(() => {})
   }, [addActivity])
 
@@ -239,214 +261,218 @@ export default function App() {
             borderLeft: '1px solid var(--border-default)',
           }}
         >
-          {/* Top: scrollable agents + fund */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-            <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} />
-
-            <div className="px-2 py-1.5 space-y-px">
-              {visibleAgents.map(agent => {
-                const name = agent.ensName.replace('.responsesurface.eth', '')
-                const color = AGENT_COLORS[name] || 'var(--status-off)'
-                const cred = agent.credibilityScore ?? 0
-                const isFlagged = agent.status === 'flagged'
-                const isExpanded = expandedAgent === agent.ensName
-                return (
-                  <div key={agent.ensName}>
-                    <div
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 cursor-pointer transition-colors rounded-[var(--radius)] ${isExpanded ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'}`}
-                      style={{ borderLeft: `3px solid ${color}` }}
-                      onClick={() => setExpandedAgent(isExpanded ? null : agent.ensName)}
-                    >
-                      <div className="relative shrink-0 w-[26px] h-[26px]">
-                        <div
-                          className="w-full h-full rounded-full flex items-center justify-center text-[10px] font-bold uppercase"
-                          style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `1.5px solid ${color}` }}
-                        >
-                          {name[0]}
-                        </div>
-                        <img
-                          src={`/images/agents/${name}.webp`}
-                          alt=""
-                          className="absolute inset-0 w-full h-full rounded-full object-cover border"
-                          style={{ borderColor: color }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        />
-                        <div
-                          className={`absolute -bottom-px -right-px w-[7px] h-[7px] rounded-full border border-[var(--color-surface)] ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
-                          style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
-                        />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-medium text-[var(--color-text)]">{name}</span>
-                          <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium"
-                            style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
-                            {agent.role}
-                          </span>
-                          {isFlagged && (
-                            <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
-                              flagged
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[9px] text-[var(--color-text-placeholder)] mt-px truncate">
-                          {REGION_LABELS[name]} — {AGENT_DESCRIPTIONS[name]}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="text-[14px] font-medium font-[var(--font-mono)] tabular leading-none"
-                          style={{ color: credColor(cred) }}>
-                          {cred}
-                        </div>
-                        <div className="text-[7px] uppercase tracking-wider mt-0.5" style={{ color: credColor(cred), opacity: 0.7 }}>
-                          {credLabel(cred)}
-                        </div>
-                      </div>
-
-                      <div className="text-[10px] text-[var(--color-text-placeholder)] shrink-0">
-                        {isExpanded ? '▾' : '▸'}
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="ml-[18px] pl-3 border-l-2 mb-1 mt-0.5 space-y-2 py-2" style={{ borderColor: color }}>
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[22px] font-light font-[var(--font-mono)] tabular leading-none" style={{ color: credColor(cred) }}>
-                              {cred}
-                            </span>
-                            <span className="text-[10px] text-[var(--color-text-placeholder)]">/1000</span>
-                          </div>
-                          <div className="mt-1.5 h-[3px] bg-[var(--border-default)] rounded-[1px] overflow-hidden">
-                            <div className="h-full rounded-[1px] transition-all duration-700"
-                              style={{ width: `${(cred / 1000) * 100}%`, background: credColor(cred) }} />
-                          </div>
-                        </div>
-
-                        {isFlagged && (
-                          <div className="px-2 py-1.5 rounded-[var(--radius)] text-[9px] leading-relaxed"
-                            style={{ background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)', color: 'var(--status-critical)' }}>
-                            Credibility below threshold — allocations reduced by proof multiplier
-                          </div>
-                        )}
-
-                        <div>
-                          <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Data Sources</div>
-                          <div className="flex flex-wrap gap-1">
-                            {agent.dataSources.map(ds => (
-                              <span key={ds} className="px-1.5 py-px rounded-[var(--radius)] text-[9px] font-medium text-[var(--color-text-secondary)] bg-[var(--color-header)] border border-[var(--border-default)]">
-                                {ds}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Region</div>
-                          <code className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] bg-[var(--color-header)] px-1.5 py-0.5 rounded-[var(--radius)] block border border-[var(--border-default)]">
-                            [{agent.bioregion.bbox.west.toFixed(1)}, {agent.bioregion.bbox.south.toFixed(1)}] → [{agent.bioregion.bbox.east.toFixed(1)}, {agent.bioregion.bbox.north.toFixed(1)}]
-                          </code>
-                        </div>
-
-                        <a
-                          href={`https://app.ens.domains/${agent.ensName}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[9px] font-[var(--font-mono)] hover:underline block"
-                          style={{ color: 'var(--color-interactive)' }}
-                        >
-                          {agent.ensName} ↗
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
-
-            <div className="px-4 py-3">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <span className="text-[22px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
-                    {formatEth(fundBalance)}
-                  </span>
-                  <span className="text-[10px] text-[var(--color-text-placeholder)] ml-1.5">fUSD</span>
-                </div>
-                <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">
-                  {formatEth(fundAllocated)} allocated
-                </span>
-              </div>
-
-              {allocations.length > 0 && (
-                <FundPanel
-                  balance={fundBalance}
-                  totalAllocated={fundAllocated}
-                  allocations={allocations}
-                  cycleNumber={cycleNumber}
-                />
-              )}
-
-              <div className="mt-3">
-                <CycleSimulator
-                  agents={agents}
-                  disasters={disasters}
-                  cycleNumber={cycleNumber}
-                  onActivity={addActivity}
-                  onAllocations={setAllocations}
-                  onCycleAdvance={() => setCycleNumber(n => n + 1)}
-                  onAgentUpdate={handleAgentUpdate}
-                  onFundUpdate={(balance, allocated) => {
-                    setFundBalance(balance)
-                    setFundAllocated(allocated)
-                  }}
-                  onMapState={setCycleMapState}
-                  onMessage={addMessage}
-                />
-              </div>
-
-              {disasters.length === 0 && (
-                <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
-                  Loading disaster data from NASA EONET...
-                </p>
-              )}
-            </div>
+          {/* Tab bar at top */}
+          <div className="flex shrink-0 bg-[var(--color-header)] border-b border-[var(--border-default)]">
+            {([
+              { key: 'dashboard' as const, label: 'Dashboard' },
+              { key: 'feed' as const, label: `Feed (${activities.length})` },
+              { key: 'comms' as const, label: `Comms (${messages.length})` },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                className={`flex-1 px-3 py-2 text-[10px] uppercase tracking-wider font-medium transition-colors cursor-pointer border-b-2 ${
+                  sidebarTab === tab.key
+                    ? 'text-[var(--color-interactive)] border-[var(--color-interactive)]'
+                    : 'text-[var(--color-text-placeholder)] hover:text-[var(--color-text-secondary)] border-transparent'
+                }`}
+                onClick={() => setSidebarTab(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* Bottom: tabbed Feed / Comms */}
-          <div className="shrink-0 flex flex-col" style={{ height: '35%', borderTop: '1px solid var(--border-default)' }}>
-            <div className="flex bg-[var(--color-header)]">
-              <button
-                className={`flex-1 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium transition-colors cursor-pointer ${
-                  sidebarTab === 'feed'
-                    ? 'text-[var(--color-interactive)] border-b-2 border-[var(--color-interactive)]'
-                    : 'text-[var(--color-text-placeholder)] hover:text-[var(--color-text-secondary)] border-b-2 border-transparent'
-                }`}
-                onClick={() => setSidebarTab('feed')}
-              >
-                Feed ({activities.length})
-              </button>
-              <button
-                className={`flex-1 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium transition-colors cursor-pointer ${
-                  sidebarTab === 'comms'
-                    ? 'text-[var(--color-interactive)] border-b-2 border-[var(--color-interactive)]'
-                    : 'text-[var(--color-text-placeholder)] hover:text-[var(--color-text-secondary)] border-b-2 border-transparent'
-                }`}
-                onClick={() => setSidebarTab('comms')}
-              >
-                Comms ({messages.length})
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-2 py-1.5">
-              {sidebarTab === 'feed' ? (
+          {/* Tab content — full scroll area */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
+            {sidebarTab === 'dashboard' && (
+              <>
+                <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} />
+
+                <div className="px-2 py-1.5 space-y-px">
+                  {visibleAgents.map(agent => {
+                    const name = agent.ensName.replace('.responsesurface.eth', '')
+                    const color = AGENT_COLORS[name] || 'var(--status-off)'
+                    const cred = agent.credibilityScore ?? 0
+                    const isFlagged = agent.status === 'flagged'
+                    const isExpanded = expandedAgent === agent.ensName
+                    return (
+                      <div key={agent.ensName}>
+                        <div
+                          className={`flex items-center gap-2.5 px-2.5 py-1.5 cursor-pointer transition-colors rounded-[var(--radius)] ${isExpanded ? 'bg-[var(--color-hover)]' : 'hover:bg-[var(--color-hover)]'}`}
+                          style={{ borderLeft: `3px solid ${color}` }}
+                          onClick={() => setExpandedAgent(isExpanded ? null : agent.ensName)}
+                        >
+                          <div className="relative shrink-0 w-[26px] h-[26px]">
+                            <div
+                              className="w-full h-full rounded-full flex items-center justify-center text-[10px] font-bold uppercase"
+                              style={{ background: `color-mix(in srgb, ${color} 25%, var(--color-surface))`, color, border: `1.5px solid ${color}` }}
+                            >
+                              {name[0]}
+                            </div>
+                            <img
+                              src={`/images/agents/${name}.webp`}
+                              alt=""
+                              className="absolute inset-0 w-full h-full rounded-full object-cover border"
+                              style={{ borderColor: color }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                            <div
+                              className={`absolute -bottom-px -right-px w-[7px] h-[7px] rounded-full border border-[var(--color-surface)] ${isFlagged ? 'status-glow-critical' : 'status-glow-normal'}`}
+                              style={{ background: isFlagged ? 'var(--status-critical)' : 'var(--status-normal)' }}
+                            />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-medium text-[var(--color-text)]">{name}</span>
+                              <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium"
+                                style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
+                                {agent.role}
+                              </span>
+                              {isFlagged && (
+                                <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>
+                                  flagged
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[9px] text-[var(--color-text-placeholder)] mt-px truncate">
+                              {REGION_LABELS[name]} — {AGENT_DESCRIPTIONS[name]}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-[14px] font-medium font-[var(--font-mono)] tabular leading-none"
+                              style={{ color: credColor(cred) }}>
+                              {cred}
+                            </div>
+                            <div className="text-[7px] uppercase tracking-wider mt-0.5" style={{ color: credColor(cred), opacity: 0.7 }}>
+                              {credLabel(cred)}
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] text-[var(--color-text-placeholder)] shrink-0">
+                            {isExpanded ? '▾' : '▸'}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="ml-[18px] pl-3 border-l-2 mb-1 mt-0.5 space-y-2 py-2" style={{ borderColor: color }}>
+                            <div>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-[22px] font-light font-[var(--font-mono)] tabular leading-none" style={{ color: credColor(cred) }}>
+                                  {cred}
+                                </span>
+                                <span className="text-[10px] text-[var(--color-text-placeholder)]">/1000</span>
+                              </div>
+                              <div className="mt-1.5 h-[3px] bg-[var(--border-default)] rounded-[1px] overflow-hidden">
+                                <div className="h-full rounded-[1px] transition-all duration-700"
+                                  style={{ width: `${(cred / 1000) * 100}%`, background: credColor(cred) }} />
+                              </div>
+                            </div>
+
+                            {isFlagged && (
+                              <div className="px-2 py-1.5 rounded-[var(--radius)] text-[9px] leading-relaxed"
+                                style={{ background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)', color: 'var(--status-critical)' }}>
+                                Credibility below threshold — allocations reduced by proof multiplier
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Data Sources</div>
+                              <div className="flex flex-wrap gap-1">
+                                {agent.dataSources.map(ds => (
+                                  <span key={ds} className="px-1.5 py-px rounded-[var(--radius)] text-[9px] font-medium text-[var(--color-text-secondary)] bg-[var(--color-header)] border border-[var(--border-default)]">
+                                    {ds}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[8px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1">Region</div>
+                              <code className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] bg-[var(--color-header)] px-1.5 py-0.5 rounded-[var(--radius)] block border border-[var(--border-default)]">
+                                [{agent.bioregion.bbox.west.toFixed(1)}, {agent.bioregion.bbox.south.toFixed(1)}] → [{agent.bioregion.bbox.east.toFixed(1)}, {agent.bioregion.bbox.north.toFixed(1)}]
+                              </code>
+                            </div>
+
+                            <a
+                              href={`https://app.ens.domains/${agent.ensName}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] font-[var(--font-mono)] hover:underline block"
+                              style={{ color: 'var(--color-interactive)' }}
+                            >
+                              {agent.ensName} ↗
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
+
+                <div className="px-4 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <span className="text-[22px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
+                        {formatEth(fundBalance)}
+                      </span>
+                      <span className="text-[10px] text-[var(--color-text-placeholder)] ml-1.5">fUSD</span>
+                    </div>
+                    <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">
+                      {formatEth(fundAllocated)} allocated
+                    </span>
+                  </div>
+
+                  {allocations.length > 0 && (
+                    <FundPanel
+                      balance={fundBalance}
+                      totalAllocated={fundAllocated}
+                      allocations={allocations}
+                      cycleNumber={cycleNumber}
+                    />
+                  )}
+
+                  <div className="mt-3">
+                    <CycleSimulator
+                      agents={agents}
+                      disasters={disasters}
+                      cycleNumber={cycleNumber}
+                      onActivity={addActivity}
+                      onAllocations={setAllocations}
+                      onCycleAdvance={() => setCycleNumber(n => n + 1)}
+                      onAgentUpdate={handleAgentUpdate}
+                      onFundUpdate={(balance, allocated) => {
+                        setFundBalance(balance)
+                        setFundAllocated(allocated)
+                      }}
+                      onMapState={setCycleMapState}
+                      onMessage={addMessage}
+                    />
+                  </div>
+
+                  {disasters.length === 0 && (
+                    <p className="text-[10px] text-[var(--color-text-placeholder)] mt-2">
+                      Loading disaster data from NASA EONET...
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {sidebarTab === 'feed' && (
+              <div className="px-2 py-1.5">
                 <ActivityFeed activities={activities} />
-              ) : (
+              </div>
+            )}
+
+            {sidebarTab === 'comms' && (
+              <div className="px-2 py-1.5">
                 <CommsFeed messages={messages} />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </aside>
       </div>
@@ -494,8 +520,8 @@ function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
       {activities.map(event => {
         const cfg = TYPE_CONFIG[event.type]
         return (
-          <div key={event.id} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
-            <div className="w-[5px] h-[5px] rounded-full mt-1 shrink-0" style={{ background: cfg.dot }} />
+          <div key={event.id} className="flex gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="w-[6px] h-[6px] rounded-full shrink-0 mt-[5px]" style={{ background: cfg.dot }} />
             <div className="flex-1 min-w-0">
               <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
                 {event.message}

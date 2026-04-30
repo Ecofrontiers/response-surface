@@ -647,7 +647,7 @@ app.post('/api/cycle/run', async (req, res) => {
       teeVerified = plan.teeVerified
       emit('system', `0G Compute — allocation plan verified in TEE enclave`)
     } catch (e) {
-      emit('system', `0G Compute — TEE offline, using local credibility weighting`)
+      emit('system', `0G Compute — TEE error: ${(e as Error).message}`)
     }
   } else {
     emit('system', `0G Compute — TEE not configured, using local credibility weighting`)
