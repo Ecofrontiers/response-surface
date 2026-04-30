@@ -221,7 +221,7 @@ async function runCoordinator() {
 
     try {
       await fund.advanceCycle()
-      console.log(`[coordinator] Cycle ${cycleNumber} advanced on-chain`)
+      console.log(`[coordinator] Cycle ${cycleNumber} advanced onchain`)
     } catch (e) {
       console.warn('[coordinator] Cycle advance failed:', (e as Error).message)
     }

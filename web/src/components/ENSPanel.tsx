@@ -116,17 +116,23 @@ export default function ENSPanel({ agents, onClose }: ENSPanelProps) {
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Trust Chain via ENS</h3>
-            <div className="p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03]">
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">How ENS Works Here</h3>
+            <div className="p-3 rounded-[var(--radius)] border border-cyan-500/20 bg-cyan-500/[0.03] space-y-3">
               <div className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed space-y-2">
                 <div>
-                  <span className="text-cyan-400 font-medium">Identity gate:</span> Coordinator reads <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">axl.pubkey</code> from ENS before accepting assessments. No ENS subname = no allocation.
+                  <span className="text-cyan-400 font-medium">Identity gate:</span> Before accepting an assessment, the coordinator reads the agent&apos;s ENS subname. No registered subname under <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">responsesurface.eth</code> = no allocation. This prevents unregistered agents from receiving funds.
                 </div>
                 <div>
-                  <span className="text-cyan-400 font-medium">Cross-chain link:</span> <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">0g.address</code> text record maps Sepolia ENS identity to 0G Chain wallet for fund disbursement.
+                  <span className="text-cyan-400 font-medium">Credibility onchain:</span> After each cycle, the coordinator writes updated <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">credibility.score</code> and <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">credibility.proofs</code> as text records on Sepolia. These persist across cycles and cannot be forged. Rogue agents with 0 verified proofs accumulate low scores that reduce their fund share.
                 </div>
                 <div>
-                  <span className="text-cyan-400 font-medium">Credibility history:</span> Scores accumulate across allocation cycles via <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">credibility.score</code> and <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">credibility.proofs</code>. History cannot be faked — it&apos;s on Sepolia.
+                  <span className="text-cyan-400 font-medium">Cross-chain:</span> <code className="text-[10px] bg-[var(--color-base)] px-1 rounded">0g.address</code> maps the Sepolia ENS identity to the agent&apos;s 0G Chain wallet for fund disbursement. Two chains, one identity.
+                </div>
+              </div>
+              <div className="px-2.5 py-2 rounded-[var(--radius)] bg-[var(--color-base)] border border-[var(--border-default)]">
+                <div className="text-[10px] text-[var(--color-text-placeholder)] leading-relaxed">
+                  <span className="text-cyan-400">Note:</span> The ENS app may show &quot;0 Records&quot; because it doesn&apos;t enumerate custom text record keys.
+                  The records are onchain &mdash; verify by querying the Public Resolver directly with <code className="bg-[var(--color-header)] px-1 rounded">text(namehash, key)</code>.
                 </div>
               </div>
             </div>

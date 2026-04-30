@@ -190,6 +190,8 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       map.addImage('icon-storm', createDisasterIcon('#a855f7', 'diamond'), { pixelRatio: 2 })
       map.addImage('icon-ice', createDisasterIcon('#06b6d4', 'circle'), { pixelRatio: 2 })
       map.addImage('icon-volcano', createDisasterIcon('#f97316', 'triangle'), { pixelRatio: 2 })
+      map.addImage('icon-earthquake', createDisasterIcon('#f59e0b', 'diamond'), { pixelRatio: 2 })
+      map.addImage('icon-fire', createDisasterIcon('#ff6b35', 'triangle'), { pixelRatio: 2 })
       map.addImage('icon-default', createDisasterIcon('#f59e0b', 'circle'), { pixelRatio: 2 })
 
       // === BASE SOURCES ===
@@ -350,7 +352,8 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
           'circle-stroke-width': ['interpolate', ['linear'], ['get', 'severity'], 1, 1, 5, 1.5, 10, 2.5],
           'circle-stroke-color': ['match', ['get', 'category'],
             'wildfires', '#ef4444', 'floods', '#3b82f6', 'severeStorms', '#a855f7',
-            'seaLakeIce', '#06b6d4', 'volcanoes', '#f97316', '#f59e0b',
+            'seaLakeIce', '#06b6d4', 'volcanoes', '#f97316',
+            'earthquake', '#f59e0b', 'fire', '#ff6b35', '#f59e0b',
           ],
           'circle-stroke-opacity': 0.4,
         },
@@ -363,7 +366,8 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         layout: {
           'icon-image': ['match', ['get', 'category'],
             'wildfires', 'icon-wildfire', 'floods', 'icon-flood', 'severeStorms', 'icon-storm',
-            'seaLakeIce', 'icon-ice', 'volcanoes', 'icon-volcano', 'icon-default',
+            'seaLakeIce', 'icon-ice', 'volcanoes', 'icon-volcano',
+            'earthquake', 'icon-earthquake', 'fire', 'icon-fire', 'icon-default',
           ],
           'icon-size': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.8, 5, 1.2, 10, 1.8],
           'icon-allow-overlap': true,
@@ -990,13 +994,25 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 17.7,13 2.3,13" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-600">Wildfire / volcano — NASA EONET</span>
+          <span className="text-gray-600">Wildfire / volcano — EONET</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
+            <polygon points="10,3 17.7,13 2.3,13" fill="#ff6b35" stroke="white" strokeWidth="1.5"/>
+          </svg>
+          <span className="text-gray-600">Fire hotspot — NASA FIRMS</span>
         </div>
         <div className="flex items-center gap-2">
           <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
             <polygon points="10,3 16,10 10,17 4,10" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
           </svg>
-          <span className="text-gray-600">Flood / storm — NASA EONET</span>
+          <span className="text-gray-600">Flood / storm — EONET</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
+            <polygon points="10,3 16,10 10,17 4,10" fill="#f59e0b" stroke="white" strokeWidth="1.5"/>
+          </svg>
+          <span className="text-gray-600">Earthquake — USGS</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#22c55e]" style={{ background: 'linear-gradient(135deg, #f97316, #3b82f6)' }} />

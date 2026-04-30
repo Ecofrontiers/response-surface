@@ -3,8 +3,7 @@ import Header from './components/Header'
 import Globe from './components/Globe'
 import FundPanel from './components/FundPanel'
 import CycleSimulator from './components/CycleSimulator'
-import ArchitecturePanel from './components/ArchitecturePanel'
-import MeshPanel from './components/MeshPanel'
+import DocsPanel from './components/DocsPanel'
 import ProofPanel from './components/ProofPanel'
 import ENSPanel from './components/ENSPanel'
 import type { Agent, Disaster, Allocation, Proof, CycleMapState, AgentMessage } from './types'
@@ -114,10 +113,10 @@ export default function App() {
   const [fundAllocated, setFundAllocated] = useState(0n)
   const [cycleNumber, setCycleNumber] = useState(1)
   const [activities, setActivities] = useState<ActivityEvent[]>([])
-  const [showArchitecture, setShowArchitecture] = useState(false)
-  const [showMesh, setShowMesh] = useState(false)
+  const [showDocs, setShowDocs] = useState(false)
   const [showProofs, setShowProofs] = useState(false)
   const [showENS, setShowENS] = useState(false)
+  const [axlNodes, setAxlNodes] = useState(0)
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'feed' | 'comms'>('dashboard')
@@ -175,6 +174,15 @@ export default function App() {
         if (data.allocations?.length) setAllocations(data.allocations)
       })
       .catch(() => {})
+
+    fetch('/api/axl/status')
+      .then(r => r.json())
+      .then(data => {
+        const online = data.nodes?.filter((n: any) => n.online).length || 0
+        setAxlNodes(online)
+        if (online > 0) addActivity({ type: 'system', message: `AXL mesh — ${online} nodes online, P2P relay active` })
+      })
+      .catch(() => {})
   }, [addActivity])
 
   const handleAgentUpdate = useCallback((ensName: string, updates: Partial<Agent>) => {
@@ -204,12 +212,43 @@ export default function App() {
       .catch(() => {})
 
     fetch('https://firms.modaps.eosdis.nasa.gov/api/area/csv/VIIRS_SNPP_NRT/-124,25,-67,49/1', { signal: AbortSignal.timeout(8000) })
-      .then(r => { if (r.ok) addActivity({ type: 'assessment', message: 'NASA FIRMS connected — VIIRS hotspot feed active' }) })
+      .then(r => r.ok ? r.text() : Promise.reject('not ok'))
+      .then(csv => {
+        const lines = csv.split('\n').slice(1).filter(l => l.trim())
+        const hotspots: Disaster[] = lines.slice(0, 80).map((line, i) => {
+          const cols = line.split(',')
+          const lat = parseFloat(cols[0])
+          const lng = parseFloat(cols[1])
+          const confidence = cols[9] || 'nominal'
+          return {
+            id: `firms-${i}`,
+            title: `Fire hotspot (${confidence})`,
+            category: 'fire',
+            geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+            severity: confidence === 'high' ? 7 : confidence === 'nominal' ? 4 : 2,
+          }
+        }).filter(h => !isNaN((h.geometry as any).coordinates[0]))
+        setDisasters(prev => [...prev, ...hotspots])
+        addActivity({ type: 'assessment', message: `NASA FIRMS connected — ${hotspots.length} active fire hotspots` })
+      })
       .catch(() => {})
 
     fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson', { signal: AbortSignal.timeout(8000) })
       .then(r => r.json())
-      .then(data => addActivity({ type: 'assessment', message: `USGS connected — ${data.features?.length || 0} seismic events (M2.5+)` }))
+      .then(data => {
+        const quakes: Disaster[] = (data.features || [])
+          .filter((f: any) => f.geometry?.coordinates)
+          .slice(0, 50)
+          .map((f: any) => ({
+            id: `usgs-${f.id}`,
+            title: f.properties.place || 'Earthquake',
+            category: 'earthquake',
+            geometry: { type: 'Point' as const, coordinates: [f.geometry.coordinates[0], f.geometry.coordinates[1]] },
+            severity: Math.min(Math.round(f.properties.mag || 3), 10),
+          }))
+        setDisasters(prev => [...prev, ...quakes])
+        addActivity({ type: 'assessment', message: `USGS connected — ${quakes.length} seismic events (M2.5+)` })
+      })
       .catch(() => {})
 
     fetch('https://api.gbif.org/v1/occurrence/search?country=US&limit=1', { signal: AbortSignal.timeout(8000) })
@@ -233,13 +272,12 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-base)]">
       <Header
-        onArchitectureClick={() => setShowArchitecture(true)}
-        onMeshClick={() => setShowMesh(true)}
-        onProofsClick={() => setShowProofs(true)}
+        onDocsClick={() => setShowDocs(true)}
         onENSClick={() => setShowENS(true)}
+        onProofsClick={() => setShowProofs(true)}
         agentCount={agents.length}
-        messageCount={messages.length}
         proofCount={proofs.length}
+        axlNodes={axlNodes}
       />
 
       <div className="flex-1 flex min-h-0 relative">
@@ -472,8 +510,23 @@ export default function App() {
             )}
 
             {sidebarTab === 'comms' && (
-              <div className="px-2 py-1.5">
-                <CommsFeed messages={messages} />
+              <div>
+                <div className="px-3 py-2 bg-[var(--color-header)] border-b border-[var(--border-default)]">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-[6px] h-[6px] rounded-full ${axlNodes > 0 ? 'bg-emerald-400 status-glow-normal' : 'bg-[var(--status-off)]'}`} />
+                    <span className="text-[10px] text-[var(--color-text-placeholder)]">
+                      {axlNodes > 0
+                        ? `AXL Mesh — ${axlNodes} nodes, Ed25519 P2P`
+                        : 'AXL Mesh — connecting...'}
+                    </span>
+                    <span className="ml-auto text-[9px] font-[var(--font-mono)] text-[var(--color-text-placeholder)]">
+                      Gensyn AXL
+                    </span>
+                  </div>
+                </div>
+                <div className="px-2 py-1.5">
+                  <CommsFeed messages={messages} />
+                </div>
               </div>
             )}
           </div>
@@ -481,8 +534,7 @@ export default function App() {
       </div>
 
       {/* Modal panels */}
-      {showArchitecture && <ArchitecturePanel onClose={() => setShowArchitecture(false)} />}
-      {showMesh && <MeshPanel messages={messages} onClose={() => setShowMesh(false)} />}
+      {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
       {showENS && <ENSPanel agents={agents} onClose={() => setShowENS(false)} />}
       {showProofs && (
         <ProofPanel

@@ -316,7 +316,7 @@ app.post('/api/proofs/submit', async (req, res) => {
     const { computeCredibilityScore } = await import('./integrations/astral-proofs')
     proof.credibilityScore = computeCredibilityScore(contained, 1, contained ? 5 : 2)
 
-    // Submit proof on-chain
+    // Submit proof onchain
     const privateKey = process.env.EVM_PRIVATE_KEY
     let onChainTx = ''
     if (privateKey && process.env.RESPONSE_FUND_ADDRESS) {
@@ -515,8 +515,9 @@ app.post('/api/cycle/run', async (req, res) => {
         const containment = await checkContainmentREST(bioregionPolygon, agentLocation)
         verifiedProofDensity = containment.result ? proofDensity : 0
         if (containment.result) sources.push('Astral (location verified)')
-      } catch {
-        verifiedProofDensity = proofDensity
+      } catch (e) {
+        verifiedProofDensity = 0
+        emit('system', `Astral verification failed for ${shortName(agentEns)}: ${(e as Error).message}`)
       }
     }
 
@@ -674,11 +675,16 @@ app.post('/api/cycle/run', async (req, res) => {
   }
   const totalWeight = scored.reduce((s, a) => s + a.weight, 0)
 
+  // Allocate 3% of fund per cycle to preserve balance across many demo cycles
+  const ALLOCATION_PCT = 3n
+  const allocationPool = fundPool * ALLOCATION_PCT / 100n
+  emit('system', `Allocating ${ALLOCATION_PCT}% of balance (${fmtEth(allocationPool.toString())} fUSD) this cycle`)
+
   const SCALE = 1_000_000_000n
   const allocations = scored.map(s => {
     const share = totalWeight > 0 ? s.weight / totalWeight : 0
     const scaledShare = BigInt(Math.round(share * 1_000_000_000))
-    const amount = (fundPool * scaledShare) / SCALE
+    const amount = (allocationPool * scaledShare) / SCALE
     return {
       ensName: s.agentEns,
       amount: amount.toString(),
@@ -695,8 +701,8 @@ app.post('/api/cycle/run', async (req, res) => {
     }
   })
   const allocTotal = allocations.reduce((s, a) => s + BigInt(a.amount), 0n)
-  if (allocTotal > fundPool && allocations.length > 0) {
-    const excess = allocTotal - fundPool
+  if (allocTotal > allocationPool && allocations.length > 0) {
+    const excess = allocTotal - allocationPool
     const largest = allocations.reduce((mi, a, i) => BigInt(allocations[mi].amount) >= BigInt(a.amount) ? mi : i, 0)
     allocations[largest].amount = (BigInt(allocations[largest].amount) - excess).toString()
   }
@@ -710,7 +716,7 @@ app.post('/api/cycle/run', async (req, res) => {
     ])
   }
 
-  // Phase 6: Execute allocations on-chain, then read state
+  // Phase 6: Execute allocations onchain, then read state
   let fundBalance = ''
   let totalAllocated = ''
   if (process.env.RESPONSE_FUND_ADDRESS && privateKey) {
@@ -730,7 +736,7 @@ app.post('/api/cycle/run', async (req, res) => {
       const totalNeeded = onChainAllocations.reduce((s, a) => s + a.amount, 0n)
       if (totalNeeded > 0n) {
         const receipt = await execAllocations(fundContract, onChainAllocations)
-        emit('system', `ResponseFund — ${fmtEth(totalNeeded)} fUSD transferred on-chain`, undefined, [
+        emit('system', `ResponseFund — ${fmtEth(totalNeeded)} fUSD transferred onchain`, undefined, [
           { label: `tx: ${receipt.hash.slice(0, 10)}…`, url: `https://chainscan-galileo.0g.ai/tx/${receipt.hash}` },
         ])
       }
@@ -808,7 +814,7 @@ app.post('/api/cycle/run', async (req, res) => {
     emit('system', 'ENS — scores computed but not written (no private key)')
   }
 
-  emit('system', `Cycle ${cycleNumber} complete — ${scored.length} agents scored, ${fmtEth(fundPool)} fUSD allocated`)
+  emit('system', `Cycle ${cycleNumber} complete — ${scored.length} agents scored, ${fmtEth(allocationPool.toString())} fUSD allocated (${ALLOCATION_PCT}% of pool)`)
 
   res.json({
     cycleNumber,

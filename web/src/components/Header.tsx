@@ -3,18 +3,17 @@ import { useEffect, useState } from 'react'
 type Status = 'normal' | 'caution' | 'critical' | 'standby' | 'off'
 
 interface HeaderProps {
-  onArchitectureClick: () => void
-  onMeshClick: () => void
-  onProofsClick: () => void
+  onDocsClick: () => void
   onENSClick: () => void
+  onProofsClick: () => void
   agentCount?: number
-  messageCount?: number
   proofCount?: number
+  axlNodes?: number
 }
 
 export default function Header({
-  onArchitectureClick, onMeshClick, onProofsClick, onENSClick,
-  agentCount = 0, messageCount = 0, proofCount = 0,
+  onDocsClick, onENSClick, onProofsClick,
+  agentCount = 0, proofCount = 0, axlNodes = 0,
 }: HeaderProps) {
   const [zgStatus, setZgStatus] = useState<Status>('standby')
   const [sepoliaStatus, setSepoliaStatus] = useState<Status>('standby')
@@ -48,7 +47,7 @@ export default function Header({
   return (
     <header className="shrink-0 bg-[var(--color-header)] border-b border-[var(--border-default)]">
       <div className="px-5 h-12 flex items-center justify-between">
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2.5">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="var(--color-interactive)" strokeWidth="1.5" fill="none" />
@@ -60,20 +59,29 @@ export default function Header({
             </span>
           </div>
 
+          <button
+            onClick={onDocsClick}
+            className="w-[22px] h-[22px] rounded-full flex items-center justify-center cursor-pointer transition-all border border-[var(--border-default)] hover:border-[var(--color-interactive-muted)] hover:bg-[var(--color-hover)]"
+            title="System documentation"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="var(--color-text-placeholder)" strokeWidth="1" />
+              <text x="6" y="8.5" textAnchor="middle" fill="var(--color-text-placeholder)" fontSize="8" fontWeight="600">i</text>
+            </svg>
+          </button>
+
           <div className="h-4 w-px bg-[var(--border-default)]" />
 
           <div className="flex items-center gap-4">
             <StatusDot label="0G Chain" status={zgStatus} />
             <StatusDot label="Sepolia" status={sepoliaStatus} />
-            <StatusDot label="AXL" status={axlStatus} />
+            <StatusDot label={`AXL${axlNodes > 0 ? ` (${axlNodes})` : ''}`} status={axlStatus} />
           </div>
         </div>
 
         <nav className="flex items-center gap-1.5">
           {[
-            { label: 'Architecture', icon: '◇', color: '#f59e0b', badge: '', onClick: onArchitectureClick },
-            { label: 'AXL Mesh', icon: '⬡', color: '#8b5cf6', badge: messageCount > 0 ? String(messageCount) : '', onClick: onMeshClick },
-            { label: 'ENS', icon: '◈', color: '#06b6d4', badge: agentCount > 0 ? String(agentCount) : '', onClick: onENSClick },
+            { label: 'ENS Identity', icon: '◈', color: '#06b6d4', badge: agentCount > 0 ? String(agentCount) : '', onClick: onENSClick },
             { label: 'Proofs', icon: '◉', color: '#22c55e', badge: proofCount > 0 ? String(proofCount) : '', onClick: onProofsClick },
           ].map(btn => (
             <button
