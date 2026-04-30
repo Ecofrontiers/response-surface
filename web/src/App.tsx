@@ -237,6 +237,9 @@ export default function App() {
         onMeshClick={() => setShowMesh(true)}
         onProofsClick={() => setShowProofs(true)}
         onENSClick={() => setShowENS(true)}
+        agentCount={agents.length}
+        messageCount={messages.length}
+        proofCount={proofs.length}
       />
 
       <div className="flex-1 flex min-h-0 relative">
@@ -479,7 +482,7 @@ export default function App() {
 
       {/* Modal panels */}
       {showArchitecture && <ArchitecturePanel onClose={() => setShowArchitecture(false)} />}
-      {showMesh && <MeshPanel onClose={() => setShowMesh(false)} />}
+      {showMesh && <MeshPanel messages={messages} onClose={() => setShowMesh(false)} />}
       {showENS && <ENSPanel agents={agents} onClose={() => setShowENS(false)} />}
       {showProofs && (
         <ProofPanel

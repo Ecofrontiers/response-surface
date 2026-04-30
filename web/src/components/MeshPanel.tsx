@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { AgentMessage } from '../types'
 
 interface MeshNode {
   name: string
@@ -21,6 +22,7 @@ interface DiscoveredAgent {
 }
 
 interface MeshPanelProps {
+  messages: AgentMessage[]
   onClose: () => void
 }
 
@@ -52,7 +54,7 @@ const NODE_COLORS: Record<string, string> = {
   phantom: '#ef4444',
 }
 
-export default function MeshPanel({ onClose }: MeshPanelProps) {
+export default function MeshPanel({ messages, onClose }: MeshPanelProps) {
   const [nodes, setNodes] = useState<MeshNode[]>([])
   const [discovered, setDiscovered] = useState<DiscoveredAgent[]>([])
   const [loading, setLoading] = useState(true)
@@ -276,6 +278,37 @@ export default function MeshPanel({ onClose }: MeshPanelProps) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">
+              AXL Message Log ({messages.length})
+            </h3>
+            {messages.length === 0 ? (
+              <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-4 border border-dashed border-[var(--border-default)] rounded-[var(--radius)]">
+                Run a cycle to see agent communications over AXL
+              </div>
+            ) : (
+              <div className="space-y-px max-h-[200px] overflow-y-auto scrollbar-thin border border-[var(--border-default)] rounded-[var(--radius)] bg-[var(--color-base)]">
+                {[...messages].reverse().slice(0, 30).map(msg => {
+                  const sender = msg.sender.replace('.responsesurface.eth', '')
+                  const senderColor = NODE_COLORS[sender] || '#6b7280'
+                  return (
+                    <div key={msg.id} className="flex items-start gap-2 px-2.5 py-1.5 hover:bg-[var(--color-hover)] transition-colors font-[var(--font-mono)] text-[10px]">
+                      <div className="w-[5px] h-[5px] rounded-full mt-[5px] shrink-0" style={{ background: senderColor }} />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium" style={{ color: senderColor }}>{sender}</span>
+                        {msg.receiver && (
+                          <span className="text-[var(--color-text-placeholder)]"> → {msg.receiver.replace('.responsesurface.eth', '')}</span>
+                        )}
+                        <span className="text-[var(--color-text-secondary)] ml-1">{msg.content}</span>
+                      </div>
+                      <span className="text-[9px] text-[var(--color-text-placeholder)] shrink-0 tabular">{msg.phase}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

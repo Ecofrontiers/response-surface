@@ -7,10 +7,14 @@ interface HeaderProps {
   onMeshClick: () => void
   onProofsClick: () => void
   onENSClick: () => void
+  agentCount?: number
+  messageCount?: number
+  proofCount?: number
 }
 
 export default function Header({
   onArchitectureClick, onMeshClick, onProofsClick, onENSClick,
+  agentCount = 0, messageCount = 0, proofCount = 0,
 }: HeaderProps) {
   const [zgStatus, setZgStatus] = useState<Status>('standby')
   const [sepoliaStatus, setSepoliaStatus] = useState<Status>('standby')
@@ -67,10 +71,10 @@ export default function Header({
 
         <nav className="flex items-center gap-1.5">
           {[
-            { label: 'Architecture', icon: '◇', color: '#f59e0b', onClick: onArchitectureClick },
-            { label: 'AXL Mesh', icon: '⬡', color: '#8b5cf6', onClick: onMeshClick },
-            { label: 'ENS', icon: '◈', color: '#06b6d4', onClick: onENSClick },
-            { label: 'Proofs', icon: '◉', color: '#22c55e', onClick: onProofsClick },
+            { label: 'Architecture', icon: '◇', color: '#f59e0b', badge: '', onClick: onArchitectureClick },
+            { label: 'AXL Mesh', icon: '⬡', color: '#8b5cf6', badge: messageCount > 0 ? String(messageCount) : '', onClick: onMeshClick },
+            { label: 'ENS', icon: '◈', color: '#06b6d4', badge: agentCount > 0 ? String(agentCount) : '', onClick: onENSClick },
+            { label: 'Proofs', icon: '◉', color: '#22c55e', badge: proofCount > 0 ? String(proofCount) : '', onClick: onProofsClick },
           ].map(btn => (
             <button
               key={btn.label}
@@ -92,6 +96,14 @@ export default function Header({
             >
               <span className="text-[11px]">{btn.icon}</span>
               {btn.label}
+              {btn.badge && (
+                <span
+                  className="text-[8px] font-[var(--font-mono)] tabular px-1 py-px rounded-[2px] font-semibold"
+                  style={{ background: `color-mix(in srgb, ${btn.color} 25%, transparent)` }}
+                >
+                  {btn.badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
