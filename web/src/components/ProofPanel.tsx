@@ -1,313 +1,216 @@
-import { useState, useRef, useCallback } from 'react'
 import type { Proof } from '../types'
 
 interface ProofPanelProps {
   proofs: Proof[]
-  onProofSubmitted: (proof: Proof) => void
   onClose: () => void
 }
 
-type Step = 'idle' | 'extracting' | 'hashing' | 'attesting' | 'checking' | 'done' | 'error'
-
-function extractExifGps(file: File): Promise<[number, number] | null> {
-  return new Promise(resolve => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const view = new DataView(reader.result as ArrayBuffer)
-      if (view.getUint16(0) !== 0xFFD8) return resolve(null)
-      let offset = 2
-      while (offset < view.byteLength - 2) {
-        const marker = view.getUint16(offset)
-        if (marker === 0xFFE1) {
-          const exifData = offset + 4
-          const tiffStart = exifData + 6
-          if (view.getUint8(exifData) === 0x45 && view.getUint8(exifData + 1) === 0x78 &&
-              view.getUint8(exifData + 2) === 0x69 && view.getUint8(exifData + 3) === 0x66) {
-            const bigEndian = view.getUint16(tiffStart) === 0x4D4D
-            const ifdOffset = view.getUint32(tiffStart + 4, !bigEndian)
-            const numEntries = view.getUint16(tiffStart + ifdOffset, !bigEndian)
-            let gpsOffset = 0
-            for (let i = 0; i < numEntries; i++) {
-              const entryOffset = tiffStart + ifdOffset + 2 + i * 12
-              if (view.getUint16(entryOffset, !bigEndian) === 0x8825) {
-                gpsOffset = view.getUint32(entryOffset + 8, !bigEndian)
-                break
-              }
-            }
-            if (gpsOffset) {
-              try {
-                const gpsEntries = view.getUint16(tiffStart + gpsOffset, !bigEndian)
-                let lat = 0, lng = 0, latRef = 'N', lngRef = 'E'
-                for (let i = 0; i < gpsEntries; i++) {
-                  const entryOff = tiffStart + gpsOffset + 2 + i * 12
-                  const tag = view.getUint16(entryOff, !bigEndian)
-                  if (tag === 1) latRef = String.fromCharCode(view.getUint8(entryOff + 8))
-                  if (tag === 3) lngRef = String.fromCharCode(view.getUint8(entryOff + 8))
-                  if (tag === 2 || tag === 4) {
-                    const valOff = tiffStart + view.getUint32(entryOff + 8, !bigEndian)
-                    const deg = view.getUint32(valOff, !bigEndian) / view.getUint32(valOff + 4, !bigEndian)
-                    const min = view.getUint32(valOff + 8, !bigEndian) / view.getUint32(valOff + 12, !bigEndian)
-                    const sec = view.getUint32(valOff + 16, !bigEndian) / view.getUint32(valOff + 20, !bigEndian)
-                    const decimal = deg + min / 60 + sec / 3600
-                    if (tag === 2) lat = decimal
-                    if (tag === 4) lng = decimal
-                  }
-                }
-                if (latRef === 'S') lat = -lat
-                if (lngRef === 'W') lng = -lng
-                if (lat !== 0 || lng !== 0) return resolve([lng, lat])
-              } catch {}
-            }
-          }
-          resolve(null)
-          return
-        }
-        const segLen = view.getUint16(offset + 2)
-        offset += 2 + segLen
-      }
-      resolve(null)
-    }
-    reader.readAsArrayBuffer(file)
-  })
+const AGENT_COLORS: Record<string, string> = {
+  pacific: '#f97316', mountain: '#ef4444', central: '#f59e0b', lakes: '#3b82f6',
+  delta: '#06b6d4', gulf: '#8b5cf6', atlantic: '#10b981', northeast: '#6366f1',
 }
 
-async function hashFile(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer()
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-  return '0x' + Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+const TYPE_COLORS: Record<string, string> = {
+  Wildfire: '#ef4444',
+  Fire: '#f97316',
+  Flood: '#3b82f6',
+  Storm: '#8b5cf6',
+  'Storm damage': '#8b5cf6',
 }
 
-const SAMPLE_EVIDENCE = [
-  { file: 'wildfire_01.webp', label: 'Wildfire', coords: [-121.3, 39.8] as [number, number] },
-  { file: 'wildfire_02.webp', label: 'Fire aftermath', coords: [-118.1, 34.2] as [number, number] },
-  { file: 'flood_01.webp', label: 'Flood rescue', coords: [-90.2, 32.4] as [number, number] },
-  { file: 'flood_02.webp', label: 'River overflow', coords: [-89.5, 33.1] as [number, number] },
-  { file: 'storm_01.webp', label: 'Storm damage', coords: [-76.3, 36.8] as [number, number] },
-  { file: 'storm_02.webp', label: 'Hurricane debris', coords: [-81.2, 26.5] as [number, number] },
-]
+function proofMultiplier(density: number): number {
+  return Math.min(0.15 + density * 0.28, 1.0)
+}
 
-export default function ProofPanel({ proofs, onProofSubmitted, onClose }: ProofPanelProps) {
-  const [step, setStep] = useState<Step>('idle')
-  const [coords, setCoords] = useState<[number, number] | null>(null)
-  const [photoHash, setPhotoHash] = useState('')
-  const [fileName, setFileName] = useState('')
-  const [result, setResult] = useState<any>(null)
-  const [error, setError] = useState('')
-  const [preview, setPreview] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const handleFile = useCallback(async (file: File) => {
-    setFileName(file.name)
-    setError('')
-    setResult(null)
-    if (file.type.startsWith('image/')) setPreview(URL.createObjectURL(file))
-
-    setStep('extracting')
-    const gps = await extractExifGps(file)
-    const finalCoords = gps || [-119.4 + (Math.random() - 0.5) * 2, 37.2 + (Math.random() - 0.5) * 2] as [number, number]
-    setCoords(finalCoords)
-
-    setStep('hashing')
-    const hash = await hashFile(file)
-    setPhotoHash(hash)
-
-    setStep('attesting')
-    try {
-      const res = await fetch('/api/proofs/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          responderEns: 'responder.responsesurface.eth',
-          location: { type: 'Point', coordinates: finalCoords },
-          photoHash: hash,
-        }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setStep('done')
-        setResult(data)
-        onProofSubmitted(data.proof)
-        return
-      }
-    } catch {}
-
-    setStep('idle')
-    setError('Proof submission failed — backend unavailable')
-  }, [onProofSubmitted])
-
-  const handleSample = useCallback(async (sample: typeof SAMPLE_EVIDENCE[0]) => {
-    setCoords(sample.coords)
-    const res = await fetch(`/images/evidence/${sample.file}`)
-    const blob = await res.blob()
-    const file = new File([blob], sample.file, { type: 'image/webp' })
-    setFileName(sample.label)
-    setPreview(URL.createObjectURL(file))
-    setError('')
-    setResult(null)
-
-    setStep('extracting')
-    await new Promise(r => setTimeout(r, 400))
-
-    setStep('hashing')
-    const hash = await hashFile(file)
-    setPhotoHash(hash)
-
-    setStep('attesting')
-    try {
-      const apiRes = await fetch('/api/proofs/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          responderEns: 'responder.responsesurface.eth',
-          location: { type: 'Point', coordinates: sample.coords },
-          photoHash: hash,
-        }),
-      })
-      if (apiRes.ok) {
-        const data = await apiRes.json()
-        setStep('done')
-        setResult(data)
-        onProofSubmitted(data.proof)
-        return
-      }
-    } catch {}
-
-    setStep('idle')
-    setError('Proof submission failed — backend unavailable')
-  }, [onProofSubmitted])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
-  }, [handleFile])
-
-  const resetForm = useCallback(() => {
-    setStep('idle'); setResult(null); setCoords(null); setPhotoHash(''); setFileName(''); setError('')
-    if (preview) { URL.revokeObjectURL(preview); setPreview(null) }
-  }, [preview])
+export default function ProofPanel({ proofs, onClose }: ProofPanelProps) {
+  const verifiedCount = proofs.filter(p => p.astralVerified).length
+  const contributingAgents = new Set(proofs.map(p => p.agentEns)).size
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-[560px] max-h-[80vh] rounded-[var(--radius)] overflow-y-auto"
-        style={{ background: 'rgba(27, 45, 62, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid var(--border-default)', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
+        className="w-[740px] max-h-[85vh] bg-[var(--color-surface)] backdrop-blur-xl border border-[var(--border-default)] rounded-[var(--radius)] overflow-y-auto scrollbar-thin"
         onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 px-5 py-3 flex items-center justify-between border-b border-[var(--border-default)]" style={{ background: 'var(--color-header)' }}>
+        <div className="h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500" />
+        <div className="sticky top-0 bg-[var(--color-header)] border-b border-[var(--border-default)] px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-[14px] font-semibold text-[var(--color-text)]">Ground Truth Proofs</h2>
-            <p className="text-[10px] text-[var(--color-text-placeholder)] mt-0.5">Photo &rarr; EXIF &rarr; Astral &rarr; ENS credibility</p>
+            <h2 className="text-lg font-semibold text-[var(--color-text)]">Ground Truth Proofs</h2>
+            <p className="text-[11px] text-[var(--color-text-placeholder)] mt-0.5">
+              Field evidence &rarr; Astral verification &rarr; credibility multiplier &rarr; reward weight
+            </p>
           </div>
-          <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] cursor-pointer text-lg p-1">&times;</button>
+          <button onClick={onClose} className="text-[var(--color-text-placeholder)] hover:text-[var(--color-text)] text-xl cursor-pointer leading-none">&times;</button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
-          {/* Upload */}
-          <div
-            className={`border border-dashed rounded-[var(--radius)] transition-all cursor-pointer overflow-hidden ${
-              step === 'idle' ? 'border-[var(--border-default)] hover:border-[var(--color-interactive-muted)]' : 'border-[var(--status-normal)]'
-            }`}
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-            onClick={() => step === 'idle' && fileRef.current?.click()}
-          >
-            <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-            {preview && step !== 'idle' ? (
-              <div className="relative">
-                <img src={preview} alt="" className="w-full h-36 object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                <div className="absolute bottom-2 left-3 text-[11px] text-white font-medium">{fileName}</div>
-                {coords && <div className="absolute bottom-2 right-3 text-[9px] text-white/60 font-[var(--font-mono)] tabular">[{coords[0].toFixed(3)}, {coords[1].toFixed(3)}]</div>}
+        <div className="px-6 py-5 space-y-6">
+          {proofs.length === 0 ? (
+            <div className="py-10 text-center space-y-4">
+              <div className="text-[40px] opacity-30">&#x1f4f7;</div>
+              <div className="text-[13px] text-[var(--color-text-secondary)]">No proofs collected yet</div>
+              <div className="text-[11px] text-[var(--color-text-placeholder)] max-w-md mx-auto leading-relaxed">
+                Run a cycle to see ground truth evidence. Each regional agent collects disaster data from government APIs,
+                then Astral verifies that the agent&apos;s location falls within the reported disaster zone.
+                Verified proofs increase the credibility multiplier, which directly affects fund allocation.
               </div>
-            ) : (
-              <div className="p-6 text-center">
-                <div className="text-[11px] text-[var(--color-text-secondary)]">Drop geotagged photo or click to upload</div>
-                <div className="text-[9px] text-[var(--color-text-placeholder)] mt-1">EXIF GPS &middot; SHA-256 &middot; Astral attestation</div>
-              </div>
-            )}
-          </div>
-
-          {/* Sample evidence gallery */}
-          {step === 'idle' && (
-            <div>
-              <div className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--color-text-placeholder)' }}>
-                Sample field evidence
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {SAMPLE_EVIDENCE.map(s => (
-                  <button
-                    key={s.file}
-                    onClick={() => handleSample(s)}
-                    className="relative rounded-[var(--radius)] overflow-hidden cursor-pointer group border border-[var(--border-default)] hover:border-[var(--color-interactive-muted)] transition-colors"
-                  >
-                    <img src={`/images/evidence/${s.file}`} alt={s.label} className="w-full h-16 object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-70 group-hover:opacity-90 transition-opacity" />
-                    <span className="absolute bottom-1 left-1.5 text-[9px] text-white font-medium">{s.label}</span>
-                  </button>
-                ))}
-              </div>
+              <PipelineSteps />
             </div>
-          )}
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard label="Proofs Collected" value={proofs.length} color="var(--status-standby)" />
+                <StatCard label="Astral Verified" value={`${verifiedCount}/${proofs.length}`} color="var(--status-normal)" />
+                <StatCard label="Contributing Agents" value={contributingAgents} color="var(--color-interactive)" />
+              </div>
 
-          {/* Pipeline */}
-          {step !== 'idle' && (
-            <div className="space-y-1">
-              {[
-                { label: 'EXIF GPS', detail: coords ? `[${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]` : 'demo coords', done: step !== 'extracting', active: step === 'extracting' },
-                { label: 'SHA-256', detail: photoHash ? photoHash.slice(0, 22) + '...' : '', done: !['extracting','hashing'].includes(step), active: step === 'hashing' },
-                { label: 'Astral attestation', detail: 'EAS schema', done: ['checking','done'].includes(step), active: step === 'attesting' },
-                { label: 'Containment', detail: step === 'done' ? (result?.proof?.containment?.contained ? 'Inside zone' : 'Verified') : 'Checking...', done: step === 'done', active: step === 'checking' },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius)] bg-[var(--color-header)] border border-[var(--border-default)]">
-                  <div className="w-[6px] h-[6px] rounded-full shrink-0" style={{
-                    background: s.done ? 'var(--status-normal)' : s.active ? 'var(--status-standby)' : 'var(--status-off)',
-                    boxShadow: s.active ? '0 0 6px var(--status-standby)' : 'none',
-                  }} />
-                  <span className={`text-[10px] font-medium ${s.done ? 'text-[var(--color-text-secondary)]' : s.active ? 'text-[var(--color-text)]' : 'text-[var(--color-text-placeholder)]'}`}>
-                    {s.label}
-                  </span>
-                  <span className="text-[9px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] truncate ml-auto">{s.detail}</span>
+              <div>
+                <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">
+                  Evidence Gallery ({proofs.length})
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[...proofs].reverse().map((proof, i) => {
+                    const agentName = proof.agentEns.replace('.responsesurface.eth', '')
+                    const agentColor = AGENT_COLORS[agentName] || '#6b7280'
+                    const typeColor = TYPE_COLORS[proof.evidenceType || ''] || '#6b7280'
+                    const mult = proofMultiplier(proof.proofDensity || 0)
+                    return (
+                      <div key={i} className="rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)] overflow-hidden">
+                        {proof.evidenceImage && (
+                          <div className="relative h-28">
+                            <img
+                              src={`/images/evidence/${proof.evidenceImage}`}
+                              alt={proof.evidenceType || 'Evidence'}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                            <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                              <span
+                                className="text-[8px] px-1.5 py-0.5 rounded-[2px] font-semibold uppercase"
+                                style={{ background: `${typeColor}cc`, color: '#fff' }}
+                              >
+                                {proof.evidenceType}
+                              </span>
+                              {proof.astralVerified && (
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-[2px] font-semibold bg-emerald-600/90 text-white">
+                                  ASTRAL &#x2713;
+                                </span>
+                              )}
+                            </div>
+                            <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
+                              <div className="w-4 h-4 rounded-full border" style={{ borderColor: agentColor, background: `${agentColor}40` }}>
+                                <img
+                                  src={`/images/agents/${agentName}.webp`}
+                                  alt=""
+                                  className="w-full h-full rounded-full object-cover"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-medium text-white">{agentName}</span>
+                            </div>
+                            <div className="absolute bottom-2 right-2 text-[8px] text-white/60 font-[var(--font-mono)] tabular">
+                              [{(proof.location.coordinates as number[])[0].toFixed(2)}, {(proof.location.coordinates as number[])[1].toFixed(2)}]
+                            </div>
+                          </div>
+                        )}
+                        <div className="px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-[var(--color-text-placeholder)]">
+                              {proof.containment?.zone || 'Unknown zone'}
+                            </span>
+                            <span className="text-[9px] font-[var(--font-mono)]" style={{ color: proof.containment?.contained ? 'var(--status-normal)' : 'var(--status-critical)' }}>
+                              {proof.containment?.contained ? 'Inside zone' : 'Outside zone'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-[var(--color-text-placeholder)]">Proof density</span>
+                            <span className="text-[9px] font-[var(--font-mono)] text-[var(--color-text-secondary)]">{proof.proofDensity || 0} verified</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-[var(--color-text-placeholder)]">Credibility multiplier</span>
+                            <span className="text-[9px] font-[var(--font-mono)] font-medium" style={{ color: mult >= 0.7 ? 'var(--status-normal)' : mult >= 0.4 ? 'var(--status-caution)' : 'var(--status-critical)' }}>
+                              {(mult * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-[var(--border-default)] rounded-[1px] overflow-hidden">
+                            <div
+                              className="h-full rounded-[1px] transition-all"
+                              style={{
+                                width: `${mult * 100}%`,
+                                background: mult >= 0.7 ? 'var(--status-normal)' : mult >= 0.4 ? 'var(--status-caution)' : 'var(--status-critical)',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Result */}
-          {result && (
-            <div className="p-3 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
-              <div className="text-[11px] text-[var(--color-text-secondary)]">{result.message}</div>
-              <div className="mt-2 flex items-center gap-3 text-[10px]">
-                <span className="text-[var(--color-text-placeholder)]">Credibility: <span className="font-[var(--font-mono)] tabular" style={{ color: 'var(--status-normal)' }}>{result.proof?.credibilityScore}</span></span>
-                <span className="text-[var(--color-text-placeholder)]">Hash: <span className="font-[var(--font-mono)]" style={{ color: 'var(--status-standby)' }}>{result.proof?.proofHash?.slice(0, 16)}...</span></span>
               </div>
-              {step === 'done' && (
-                <button onClick={resetForm} className="mt-2 text-[10px] cursor-pointer underline" style={{ color: 'var(--color-interactive)' }}>
-                  Submit another
-                </button>
-              )}
-            </div>
+            </>
           )}
 
-          {error && <div className="p-2 rounded-[var(--radius)] text-[10px]" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.08)', border: '1px solid rgba(255,56,56,0.2)' }}>{error}</div>}
-
-          {/* Submitted proofs */}
-          {proofs.length > 0 && (
-            <div>
-              <div className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: 'var(--color-text-placeholder)' }}>Proofs ({proofs.length})</div>
-              <div className="space-y-1 max-h-28 overflow-y-auto">
-                {proofs.slice(-5).reverse().map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-[10px] py-1.5 px-2.5 rounded-[var(--radius)] bg-[var(--color-header)] border border-[var(--border-default)]">
-                    <span className="font-[var(--font-mono)]" style={{ color: 'var(--status-standby)' }}>{p.proofHash.slice(0, 12)}...</span>
-                    <span className="text-[var(--color-text-placeholder)]">{p.responderEns.replace('.responsesurface.eth', '')}</span>
-                    <span className="font-[var(--font-mono)] tabular font-medium" style={{ color: p.credibilityScore >= 500 ? 'var(--status-normal)' : 'var(--status-serious)' }}>{p.credibilityScore}</span>
-                  </div>
-                ))}
+          <div>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">How Proofs Affect Rewards</h3>
+            <div className="p-3 rounded-[var(--radius)] border border-emerald-500/20 bg-emerald-500/[0.03] space-y-3">
+              <div className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
+                Each agent&apos;s fund allocation is weighted by a proof multiplier derived from Astral-verified evidence:
+              </div>
+              <div className="font-[var(--font-mono)] text-xs text-emerald-400 bg-[var(--color-base)] rounded-[var(--radius)] px-3 py-2">
+                proofMultiplier = min(0.15 + verifiedProofs &times; 0.28, 1.0)
+              </div>
+              <div className="flex gap-4 text-[10px]">
+                <div><span className="text-red-400 font-[var(--font-mono)]">0 proofs</span> <span className="text-[var(--color-text-placeholder)]">= 15% allocation</span></div>
+                <div><span className="text-amber-400 font-[var(--font-mono)]">1 proof</span> <span className="text-[var(--color-text-placeholder)]">= 43% allocation</span></div>
+                <div><span className="text-emerald-400 font-[var(--font-mono)]">3+ proofs</span> <span className="text-[var(--color-text-placeholder)]">= 99% allocation</span></div>
+              </div>
+              <div className="text-[10px] text-[var(--color-text-placeholder)] leading-relaxed">
+                Adversarial agents (rogue, phantom) submit 0 verified proofs, so their multiplier stays at 15% &mdash;
+                even if they inflate severity scores, the credibility gate limits their fund share.
               </div>
             </div>
-          )}
+          </div>
+
+          <PipelineSteps />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <div className="p-3 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
+      <div className="text-[18px] font-light font-[var(--font-mono)] tabular" style={{ color }}>{value}</div>
+      <div className="text-[9px] text-[var(--color-text-placeholder)] mt-0.5 uppercase tracking-wider">{label}</div>
+    </div>
+  )
+}
+
+function PipelineSteps() {
+  const steps = [
+    { icon: '&#x1f4f7;', label: 'Field Photo', detail: 'Geotagged evidence', color: '#06b6d4' },
+    { icon: '&#x1f4cd;', label: 'EXIF GPS', detail: 'Extract coordinates', color: '#3b82f6' },
+    { icon: '&#x1f310;', label: 'Astral', detail: 'Location attestation', color: '#22c55e' },
+    { icon: '&#x2713;', label: 'Containment', detail: 'Inside disaster zone?', color: '#22c55e' },
+    { icon: '&#x2b50;', label: 'Credibility', detail: 'Update ENS score', color: '#f59e0b' },
+    { icon: '&#x1f4b0;', label: 'Rewards', detail: 'Weight allocation', color: '#10b981' },
+  ]
+  return (
+    <div>
+      <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">Proof Pipeline</h3>
+      <div className="flex items-center gap-1 flex-wrap">
+        {steps.map((s, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius)] border text-[10px]"
+              style={{ borderColor: `${s.color}30`, color: s.color, background: `${s.color}08` }}
+            >
+              <span dangerouslySetInnerHTML={{ __html: s.icon }} className="text-[11px]" />
+              <span className="font-medium">{s.label}</span>
+            </div>
+            {i < steps.length - 1 && <span className="text-[var(--color-text-placeholder)] text-[10px]">&rarr;</span>}
+          </div>
+        ))}
       </div>
     </div>
   )

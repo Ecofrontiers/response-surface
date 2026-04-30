@@ -43,6 +43,11 @@ export interface Proof {
   disasterId: string
   timestamp: number
   proofHash: string
+  astralVerified?: boolean
+  containment?: { contained: boolean; zone: string }
+  evidenceImage?: string
+  evidenceType?: string
+  proofDensity?: number
 }
 
 export interface CycleMapState {

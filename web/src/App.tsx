@@ -4,6 +4,7 @@ import Globe from './components/Globe'
 import FundPanel from './components/FundPanel'
 import CycleSimulator from './components/CycleSimulator'
 import DocsPanel from './components/DocsPanel'
+import MeshPanel from './components/MeshPanel'
 import ProofPanel from './components/ProofPanel'
 import ENSPanel from './components/ENSPanel'
 import type { Agent, Disaster, Allocation, Proof, CycleMapState, AgentMessage } from './types'
@@ -114,6 +115,7 @@ export default function App() {
   const [cycleNumber, setCycleNumber] = useState(1)
   const [activities, setActivities] = useState<ActivityEvent[]>([])
   const [showDocs, setShowDocs] = useState(false)
+  const [showMesh, setShowMesh] = useState(false)
   const [showProofs, setShowProofs] = useState(false)
   const [showENS, setShowENS] = useState(false)
   const [axlNodes, setAxlNodes] = useState(0)
@@ -491,6 +493,7 @@ export default function App() {
                       }}
                       onMapState={setCycleMapState}
                       onMessage={addMessage}
+                      onProofs={(newProofs) => setProofs(prev => [...prev, ...newProofs])}
                     />
                   </div>
 
@@ -519,9 +522,41 @@ export default function App() {
                         ? `AXL Mesh — ${axlNodes} nodes, Ed25519 P2P`
                         : 'AXL Mesh — connecting...'}
                     </span>
-                    <span className="ml-auto text-[9px] font-[var(--font-mono)] text-[var(--color-text-placeholder)]">
-                      Gensyn AXL
-                    </span>
+                    <button
+                      onClick={() => setShowMesh(true)}
+                      className="ml-auto text-[9px] font-[var(--font-mono)] px-2 py-0.5 rounded-[var(--radius)] cursor-pointer transition-all border"
+                      style={{
+                        color: '#8b5cf6',
+                        borderColor: 'rgba(139,92,246,0.3)',
+                        background: 'rgba(139,92,246,0.06)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.15)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.06)' }}
+                    >
+                      Mesh Topology
+                    </button>
+                  </div>
+                </div>
+                <div className="px-3 py-2 border-b border-[var(--border-default)]">
+                  <div className="grid grid-cols-5 gap-x-3 gap-y-1">
+                    {['coordinator', 'pacific', 'mountain', 'central', 'lakes', 'delta', 'gulf', 'atlantic', 'northeast', 'rogue'].map(name => {
+                      const isAdversary = name === 'rogue' || name === 'phantom'
+                      const nodeColor = AGENT_COLORS[name] || 'var(--status-off)'
+                      return (
+                        <div key={name} className="flex items-center gap-1.5">
+                          <div
+                            className={`w-[5px] h-[5px] rounded-full ${axlNodes > 0 ? '' : ''}`}
+                            style={{ background: axlNodes > 0 ? nodeColor : 'var(--status-off)' }}
+                          />
+                          <span className={`text-[8px] truncate ${isAdversary ? 'text-red-400/60' : 'text-[var(--color-text-placeholder)]'}`}>
+                            {name}
+                          </span>
+                          <span className="text-[7px] font-[var(--font-mono)] text-[var(--color-text-placeholder)] ml-auto">
+                            {axlNodes > 0 ? '18p' : '—'}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
                 <div className="px-2 py-1.5">
@@ -535,14 +570,11 @@ export default function App() {
 
       {/* Modal panels */}
       {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
+      {showMesh && <MeshPanel messages={messages} onClose={() => setShowMesh(false)} />}
       {showENS && <ENSPanel agents={agents} onClose={() => setShowENS(false)} />}
       {showProofs && (
         <ProofPanel
           proofs={proofs}
-          onProofSubmitted={proof => {
-            setProofs(prev => [...prev, proof])
-            addActivity({ type: 'proof', agent: proof.agentEns, message: `Proof submitted: ${proof.proofHash.slice(0, 14)}...` })
-          }}
           onClose={() => setShowProofs(false)}
         />
       )}

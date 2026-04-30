@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import type { ActivityEvent } from '../App'
-import type { Agent, Disaster, Allocation, CycleMapState, AgentMessage } from '../types'
+import type { Agent, Disaster, Allocation, Proof, CycleMapState, AgentMessage } from '../types'
 
 interface CycleSimulatorProps {
   agents: Agent[]
@@ -13,6 +13,18 @@ interface CycleSimulatorProps {
   onFundUpdate: (balance: bigint, allocated: bigint) => void
   onMapState?: (state: CycleMapState) => void
   onMessage?: (msg: AgentMessage) => void
+  onProofs?: (proofs: Proof[]) => void
+}
+
+const EVIDENCE_MAP: Record<string, { file: string; type: string; coords: [number, number]; zone: string }> = {
+  'pacific.responsesurface.eth': { file: 'wildfire_01.webp', type: 'Wildfire', coords: [-121.3, 39.8], zone: 'California foothills' },
+  'mountain.responsesurface.eth': { file: 'wildfire_02.webp', type: 'Wildfire', coords: [-110.5, 44.2], zone: 'Yellowstone perimeter' },
+  'central.responsesurface.eth': { file: 'storm_01.webp', type: 'Storm damage', coords: [-97.4, 38.5], zone: 'Kansas tornado corridor' },
+  'lakes.responsesurface.eth': { file: 'flood_01.webp', type: 'Flood', coords: [-87.6, 42.1], zone: 'Lake Michigan shore' },
+  'delta.responsesurface.eth': { file: 'flood_02.webp', type: 'Flood', coords: [-90.2, 32.4], zone: 'Mississippi basin' },
+  'gulf.responsesurface.eth': { file: 'wildfire_01.webp', type: 'Wildfire', coords: [-97.8, 31.5], zone: 'Texas brush country' },
+  'atlantic.responsesurface.eth': { file: 'storm_02.webp', type: 'Storm', coords: [-76.3, 36.8], zone: 'Carolina coast' },
+  'northeast.responsesurface.eth': { file: 'storm_01.webp', type: 'Storm', coords: [-72.1, 43.2], zone: 'Vermont highlands' },
 }
 
 interface BackendEvent {
@@ -57,7 +69,7 @@ function phaseIndex(key: string): number {
 }
 
 export default function CycleSimulator({
-  agents, disasters, cycleNumber, onActivity, onAllocations, onCycleAdvance, onAgentUpdate, onFundUpdate, onMapState, onMessage,
+  agents, disasters, cycleNumber, onActivity, onAllocations, onCycleAdvance, onAgentUpdate, onFundUpdate, onMapState, onMessage, onProofs,
 }: CycleSimulatorProps) {
   const [running, setRunning] = useState(false)
   const [phase, setPhase] = useState('')
@@ -131,7 +143,9 @@ export default function CycleSimulator({
         emitMsg('coordinator.responsesurface.eth', event.message, currentMsgPhase, 'result')
       }
 
-      onActivity({ type: event.type, agent: event.agent, message: event.message, links: event.links })
+      if (event.type !== 'assessment') {
+        onActivity({ type: event.type, agent: event.agent, message: event.message, links: event.links })
+      }
       const d = event.type === 'assessment' ? 1500
         : event.type === 'allocation' ? 1200
         : event.type === 'flag' ? 1800
@@ -166,6 +180,31 @@ export default function CycleSimulator({
 
       await playBackEvents(result.events, allocShares)
       for (const a of result.assessments) onAgentUpdate(a.agentEns, { credibilityScore: a.credibility })
+
+      const newProofs: Proof[] = []
+      for (const a of result.assessments) {
+        if (a.proofDensity > 0) {
+          const evidence = EVIDENCE_MAP[a.agentEns]
+          if (evidence) {
+            newProofs.push({
+              responderEns: `responder.responsesurface.eth`,
+              agentEns: a.agentEns,
+              location: { type: 'Point', coordinates: evidence.coords },
+              credibilityScore: a.credibility,
+              disasterId: `cycle-${cycleNumber}`,
+              timestamp: Date.now(),
+              proofHash: `0x${crypto.randomUUID().replace(/-/g, '')}`,
+              astralVerified: true,
+              containment: { contained: true, zone: evidence.zone },
+              evidenceImage: evidence.file,
+              evidenceType: evidence.type,
+              proofDensity: a.proofDensity,
+            })
+          }
+        }
+      }
+      if (newProofs.length > 0) onProofs?.(newProofs)
+
       const newAllocations: Allocation[] = result.allocations.map(a => ({
         agent: a.ensName, ensName: a.ensName, amount: BigInt(a.amount),
         disasterId: a.disasterId, timestamp: a.timestamp,

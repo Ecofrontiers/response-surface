@@ -145,6 +145,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
+  const statMarkersRef = useRef<mapboxgl.Marker[]>([])
   const animFrameRef = useRef<number>(0)
   const prevAllocCountRef = useRef(0)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -759,6 +760,63 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       })),
     })
   }, [isLoaded, disasters])
+
+  // Region stat overlays
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || disasters.length === 0) return
+    const map = mapRef.current
+
+    statMarkersRef.current.forEach(m => m.remove())
+    statMarkersRef.current = []
+
+    const regionAgents = agents.filter(a => a.role !== 'coordinator' && a.role !== 'adversary')
+    for (const agent of regionAgents) {
+      const bb = agent.bioregion.bbox
+      const inRegion = disasters.filter(d => {
+        if (d.geometry.type !== 'Point') return false
+        const [lng, lat] = (d.geometry as GeoJSON.Point).coordinates
+        return lng >= bb.west && lng <= bb.east && lat >= bb.south && lat <= bb.north
+      })
+      if (inRegion.length === 0) continue
+
+      const fires = inRegion.filter(d => d.category === 'wildfires' || d.category === 'fire' || d.category === 'volcanoes').length
+      const floods = inRegion.filter(d => d.category === 'floods' || d.category === 'severeStorms').length
+      const quakes = inRegion.filter(d => d.category === 'earthquake').length
+      const other = inRegion.length - fires - floods - quakes
+
+      const name = agent.ensName.split('.')[0]
+      const color = AGENT_COLORS[name] || '#6b7280'
+
+      const parts: string[] = []
+      if (fires > 0) parts.push(`<span style="color:#ef4444">${fires} fire</span>`)
+      if (floods > 0) parts.push(`<span style="color:#3b82f6">${floods} flood</span>`)
+      if (quakes > 0) parts.push(`<span style="color:#f59e0b">${quakes} quake</span>`)
+      if (other > 0) parts.push(`<span style="color:#6b7280">${other} other</span>`)
+
+      const el = document.createElement('div')
+      el.innerHTML = `<div style="
+        background: rgba(15,23,42,0.85);
+        backdrop-filter: blur(4px);
+        border: 1px solid ${color}40;
+        border-radius: 3px;
+        padding: 2px 5px;
+        font-size: 9px;
+        font-family: 'IBM Plex Mono', monospace;
+        white-space: nowrap;
+        pointer-events: none;
+        line-height: 1.3;
+      ">
+        <div style="color:${color};font-weight:600;font-size:8px;text-transform:uppercase;letter-spacing:0.5px">${name}</div>
+        <div style="color:#94a3b8">${inRegion.length} events ${parts.join(' ')}</div>
+      </div>`
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'top' })
+        .setLngLat([agent.bioregion.center[0], agent.bioregion.center[1] - 2.5])
+        .addTo(map)
+
+      statMarkersRef.current.push(marker)
+    }
+  }, [isLoaded, disasters, agents])
 
   // Proof markers
   useEffect(() => {
