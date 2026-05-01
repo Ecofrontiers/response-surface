@@ -401,54 +401,63 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       })
 
       // === EVENT HANDLERS ===
-      map.on('click', 'disaster-icons', (e) => {
+      let activePopup: mapboxgl.Popup | null = null
+      function showPopup(lngLat: mapboxgl.LngLat, html: string, maxWidth = '200px') {
+        if (activePopup) activePopup.remove()
+        activePopup = new mapboxgl.Popup({ closeButton: false, maxWidth })
+          .setLngLat(lngLat).setHTML(html).addTo(map)
+      }
+
+      function proofPopupHtml(pp: Record<string, string>) {
+        const agentName = (pp.agent || '').replace('.responsesurface.eth', '') || 'unknown'
+        const isVerified = pp.verified === 'yes'
+        const sc = isVerified ? '#22c55e' : '#ef4444'
+        const imgHtml = pp.evidenceImage
+          ? `<img src="/images/evidence/${pp.evidenceImage}" style="width:100%;height:72px;object-fit:cover;border-radius:4px 4px 0 0;${isVerified ? '' : 'filter:grayscale(0.5) brightness(0.7)'}" />`
+          : ''
+        return { imgHtml, agentName, isVerified, sc, agentHtml: `<div style="padding:6px 10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <img src="/images/agents/${agentName}.webp" style="width:16px;height:16px;border-radius:50%;border:1px solid ${sc}" onerror="this.style.display='none'" />
+            <span style="font-weight:600">${agentName}</span>
+            <span style="font-size:8px;padding:1px 4px;border-radius:2px;background:${sc}20;color:${sc};font-weight:600">${isVerified ? 'VERIFIED' : 'REJECTED'}</span>
+          </div>
+          <div style="margin-top:3px;color:#64748b;font-size:10px">${pp.evidenceType || 'Evidence'}</div>
+          <div style="margin-top:2px;color:#94a3b8;font-size:9px">${pp.zone || ''}</div>
+        </div>` }
+      }
+
+      // Proof marker click — show proof info + nearby disaster info if any
+      map.on('click', 'proof-markers', (e) => {
         const feature = e.features?.[0]
         if (!feature || !e.lngLat) return
-        const props = feature.properties as { title: string; category: string; severity: number }
-        new mapboxgl.Popup({ closeButton: false, maxWidth: '260px' })
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <div style="font-family:Inter,sans-serif;font-size:12px;color:#1e293b;background:#ffffff;padding:8px 12px;border-radius:6px;border:1px solid #ef444440;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
-              <div style="font-weight:600;color:#ef4444">${props.title}</div>
-              <div style="margin-top:2px;color:#64748b">${props.category}</div>
-              <div style="margin-top:4px;font-size:10px;color:#94a3b8">Severity: ${props.severity}/10 · NASA EONET</div>
-            </div>
-          `)
-          .addTo(map)
+        const pp = feature.properties as Record<string, string>
+        const { imgHtml, sc, agentHtml } = proofPopupHtml(pp)
+        const disasterHits = map.queryRenderedFeatures(e.point, { layers: ['disaster-icons'] })
+        const disasterHtml = disasterHits.length > 0
+          ? `<div style="border-top:1px solid #e2e8f0;padding:6px 10px">
+              <div style="font-weight:600;color:#ef4444;font-size:11px">${(disasterHits[0].properties as Record<string, string>).title}</div>
+              <div style="margin-top:2px;color:#64748b;font-size:10px">${(disasterHits[0].properties as Record<string, string>).category} · Severity ${(disasterHits[0].properties as Record<string, string>).severity}/10</div>
+            </div>` : ''
+        showPopup(e.lngLat, `<div style="font-family:Inter,sans-serif;font-size:11px;color:#1e293b;background:#ffffff;border-radius:6px;border:1px solid ${sc}40;box-shadow:0 2px 8px rgba(0,0,0,0.15);overflow:hidden">
+          ${imgHtml}${agentHtml}${disasterHtml}
+        </div>`)
+      })
+
+      // Disaster icon click — only if no proof marker at same point
+      map.on('click', 'disaster-icons', (e) => {
+        if (map.queryRenderedFeatures(e.point, { layers: ['proof-markers'] }).length > 0) return
+        const feature = e.features?.[0]
+        if (!feature || !e.lngLat) return
+        const p = feature.properties as Record<string, string>
+        showPopup(e.lngLat, `<div style="font-family:Inter,sans-serif;font-size:12px;color:#1e293b;background:#ffffff;padding:8px 12px;border-radius:6px;border:1px solid #ef444440;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
+          <div style="font-weight:600;color:#ef4444">${p.title}</div>
+          <div style="margin-top:2px;color:#64748b">${p.category}</div>
+          <div style="margin-top:4px;font-size:10px;color:#94a3b8">Severity: ${p.severity}/10 · NASA EONET</div>
+        </div>`, '260px')
       })
 
       map.on('mouseenter', 'disaster-icons', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'disaster-icons', () => { map.getCanvas().style.cursor = '' })
-
-      map.on('click', 'proof-markers', (e) => {
-        const feature = e.features?.[0]
-        if (!feature || !e.lngLat) return
-        const props = feature.properties as { agent: string; evidenceImage: string; evidenceType: string; verified: string; zone: string; credibility: number }
-        const agentName = props.agent?.replace('.responsesurface.eth', '') || 'unknown'
-        const isVerified = props.verified === 'yes'
-        const statusColor = isVerified ? '#22c55e' : '#ef4444'
-        const statusLabel = isVerified ? 'VERIFIED' : 'REJECTED'
-        const imgHtml = props.evidenceImage
-          ? `<img src="/images/evidence/${props.evidenceImage}" style="width:100%;height:100px;object-fit:cover;border-radius:4px 4px 0 0;${isVerified ? '' : 'filter:grayscale(0.5) brightness(0.7)'}" />`
-          : ''
-        new mapboxgl.Popup({ closeButton: false, maxWidth: '220px', offset: 10 })
-          .setLngLat(e.lngLat)
-          .setHTML(`
-            <div style="font-family:Inter,sans-serif;font-size:11px;color:#1e293b;background:#ffffff;border-radius:6px;border:1px solid ${statusColor}40;box-shadow:0 2px 8px rgba(0,0,0,0.15);overflow:hidden">
-              ${imgHtml}
-              <div style="padding:6px 10px">
-                <div style="display:flex;align-items:center;gap:6px">
-                  <img src="/images/agents/${agentName}.webp" style="width:16px;height:16px;border-radius:50%;border:1px solid ${statusColor}" onerror="this.style.display='none'" />
-                  <span style="font-weight:600">${agentName}</span>
-                  <span style="font-size:8px;padding:1px 4px;border-radius:2px;background:${statusColor}20;color:${statusColor};font-weight:600">${statusLabel}</span>
-                </div>
-                <div style="margin-top:3px;color:#64748b;font-size:10px">${props.evidenceType || 'Evidence'}</div>
-                <div style="margin-top:2px;color:#94a3b8;font-size:9px">${props.zone}</div>
-              </div>
-            </div>
-          `)
-          .addTo(map)
-      })
       map.on('mouseenter', 'proof-markers', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'proof-markers', () => { map.getCanvas().style.cursor = '' })
 
@@ -778,20 +787,34 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     }
   }, [isLoaded, agents, onAgentClick])
 
-  // Disaster data
+  // Disaster data — enriched with proof info when available
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('disasters') as mapboxgl.GeoJSONSource
     if (!src) return
     src.setData({
       type: 'FeatureCollection',
-      features: disasters.map(d => ({
-        type: 'Feature' as const,
-        properties: { id: d.id, title: d.title, category: d.category, severity: d.severity || 5 },
-        geometry: d.geometry,
-      })),
+      features: disasters.map(d => {
+        const coords = d.geometry.type === 'Point' ? (d.geometry as GeoJSON.Point).coordinates : null
+        const matchedProof = coords ? proofs.find(p => {
+          const pc = p.location.coordinates
+          return Math.abs(pc[0] - coords[0]) < 0.5 && Math.abs(pc[1] - coords[1]) < 0.5
+        }) : undefined
+        return {
+          type: 'Feature' as const,
+          properties: {
+            id: d.id, title: d.title, category: d.category, severity: d.severity || 5,
+            proofAgent: matchedProof?.agentEns?.replace('.responsesurface.eth', '') || '',
+            proofImage: matchedProof?.evidenceImage || '',
+            proofVerified: matchedProof?.astralVerified ? 'yes' : '',
+            proofZone: matchedProof?.containment?.zone || '',
+            proofType: matchedProof?.evidenceType || '',
+          },
+          geometry: d.geometry,
+        }
+      }),
     })
-  }, [isLoaded, disasters])
+  }, [isLoaded, disasters, proofs])
 
   // Region stat overlays
   useEffect(() => {
@@ -853,7 +876,7 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
     }
   }, [isLoaded, disasters, agents])
 
-  // Proof markers
+  // Proof markers data
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
     const src = mapRef.current.getSource('proofs') as mapboxgl.GeoJSONSource
@@ -1135,6 +1158,10 @@ function MapLegend() {
           <div className="flex items-center gap-2">
             <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
             <span className="text-gray-600">Monitoring region</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-[10px] h-[10px] rounded-full shrink-0 bg-cyan-500 border-2 border-[#0a0e17]" />
+            <span className="text-gray-600">Astral location proof</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-[2px] shrink-0" style={{ background: '#a78bfa' }} />

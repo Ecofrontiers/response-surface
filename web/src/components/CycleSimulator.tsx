@@ -27,6 +27,7 @@ interface BackendProof {
   astralVerified: boolean
   containment: { contained: boolean; zone: string; attestation?: unknown }
   evidenceType: string
+  evidenceImage?: string
   proofDensity: number
 }
 
@@ -197,6 +198,7 @@ export default function CycleSimulator({
         astralVerified: p.astralVerified,
         containment: p.containment,
         evidenceType: p.evidenceType,
+        evidenceImage: p.evidenceImage,
         proofDensity: p.proofDensity,
       }))
 

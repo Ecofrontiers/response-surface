@@ -798,8 +798,18 @@ app.post('/api/cycle/run', async (req, res) => {
 
   if (teePlan && teePlan.zones.length > 0) {
     // TEE-derived allocations: use the plan but bound amounts to the allocation pool
-    const teeTotal = teePlan.zones.reduce((s, z) => s + parseFloat(z.amount || '0'), 0)
-    allocations = teePlan.zones.map(z => {
+    // Filter out agents with 0 proofs — they must get nothing regardless of TEE plan
+    const filteredZones = teePlan.zones.filter(z => {
+      const agent = scored.find(s => s.agentEns === z.ensName)
+      return agent ? agent.proofDensity > 0 : true
+    })
+    const excludedZones = teePlan.zones.filter(z => {
+      const agent = scored.find(s => s.agentEns === z.ensName)
+      return agent && agent.proofDensity === 0
+    })
+    const teeTotal = filteredZones.reduce((s, z) => s + parseFloat(z.amount || '0'), 0)
+    // Include excluded agents with zero allocation
+    allocations = [...filteredZones.map(z => {
       const agent = scored.find(s => s.agentEns === z.ensName)
       const share = teeTotal > 0 ? parseFloat(z.amount || '0') / teeTotal : 0
       const scaledShare = BigInt(Math.round(share * 1_000_000_000))
@@ -818,8 +828,18 @@ app.post('/api/cycle/run', async (req, res) => {
         proofDensity: agent?.proofDensity || 0,
         weight: agent?.weight || 0,
       }
-    })
-    emit('system', `Using TEE-verified allocation plan`)
+    }), ...excludedZones.map(z => {
+      const agent = scored.find(s => s.agentEns === z.ensName)
+      return {
+        ensName: z.ensName, amount: '0',
+        disasterId: agent?.disasters[0]?.id || `zone-${z.ensName}`,
+        timestamp: Date.now(),
+        assessmentHash: ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ agent: z.ensName, severity: 0, cycle: cycleNumber }))),
+        teeVerified, credibility: agent?.credibility || 0, severity: agent?.severity || 0,
+        share: 0, disasterCount: agent?.disasters.length || 0, proofDensity: 0, weight: 0,
+      }
+    })]
+    emit('system', `Using TEE-verified allocation plan (${excludedZones.length} agents excluded — 0 proofs)`)
   } else {
     // Local credibility-weighted allocation
     allocations = scored.map(s => {
