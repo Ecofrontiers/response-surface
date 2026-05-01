@@ -2,7 +2,7 @@
 
 ![Response Surface Dashboard](docs/screenshot.png)
 
-What if disaster response ran on a dynamic allocation surface instead of static emergency procurement? Agents watch real government feeds, collect location proofs from the ground, and route funds to where the data says they're needed — not where someone claims they're needed.
+What if disaster response ran on a dynamic allocation surface instead of static emergency procurement? Agents watch real government feeds, collect location proofs from the ground, and route funds to where the data says they're needed.
 
 **[Live App](https://responsesurface.vercel.app)** | **[Presentation Deck](https://responsesurface.vercel.app/deck.html)**
 
@@ -31,7 +31,7 @@ proofMultiplier = proofs == 0 ? 0 : min(0.15 + proofCount × 0.28, 1.0)
 weight = credibility × severity × disasterDensity × proofMultiplier
 ```
 
-Zero proofs means zero weight means zero allocation. Hard zero, no exceptions. Ground truth comes from Astral Protocol containment attestations on Base Sepolia — spatial verification that a geotagged photo actually falls inside the reported disaster zone. You can't fake being inside a burn zone from your couch. Credibility accumulates across rounds via ENS text records, so reputation has real memory.
+Zero proofs means zero weight means zero allocation. Ground truth comes from Astral Protocol containment attestations on Base Sepolia — spatial verification that a geotagged photo actually falls inside the reported disaster zone. Credibility accumulates across rounds via ENS text records, so reputation has real memory.
 
 ## Architecture
 
@@ -82,8 +82,18 @@ The frontend proxies `/api` to the backend. Hit **Run Allocation Cycle** to kick
 
 | What | Where |
 |---|---|
-| Agent identities | [pacific.responsesurface.eth](https://app.ens.domains/pacific.responsesurface.eth) on ENS Sepolia |
-| Credibility scores | ENS text record `credibility.score` on each agent subname |
+| [pacific.responsesurface.eth](https://app.ens.domains/pacific.responsesurface.eth) | Regional agent — CA, OR, WA, NV |
+| [mountain.responsesurface.eth](https://app.ens.domains/mountain.responsesurface.eth) | Regional agent — MT, WY, CO, UT, ID |
+| [central.responsesurface.eth](https://app.ens.domains/central.responsesurface.eth) | Regional agent — ND, SD, NE, KS, MN, IA, MO |
+| [lakes.responsesurface.eth](https://app.ens.domains/lakes.responsesurface.eth) | Regional agent — WI, MI, IL, IN, OH |
+| [delta.responsesurface.eth](https://app.ens.domains/delta.responsesurface.eth) | Regional agent — MS, AL, GA, FL, SC, TN |
+| [gulf.responsesurface.eth](https://app.ens.domains/gulf.responsesurface.eth) | Regional agent — TX, NM, AZ, OK, AR, LA |
+| [atlantic.responsesurface.eth](https://app.ens.domains/atlantic.responsesurface.eth) | Regional agent — VA, NC, MD, DE, NJ, NY |
+| [northeast.responsesurface.eth](https://app.ens.domains/northeast.responsesurface.eth) | Regional agent — PA, CT, MA, VT, NH, ME |
+| [coordinator.responsesurface.eth](https://app.ens.domains/coordinator.responsesurface.eth) | Coordinator — aggregates, scores, allocates |
+| [rogue.responsesurface.eth](https://app.ens.domains/rogue.responsesurface.eth) | Adversarial agent — tests proof gate |
+| [phantom.responsesurface.eth](https://app.ens.domains/phantom.responsesurface.eth) | Adversarial agent — tests proof gate |
+| Credibility scores | ENS text record `credibility.score` on each subname |
 | ResponseFund contract | [0x7e0D...a0](https://chainscan-galileo.0g.ai/address/0x7e0D9cf6045dd4ba622cd410a9F137a7A6d935a0) on 0G Explorer |
 | fUSD token | [0x6Cf1...A8](https://chainscan-galileo.0g.ai/address/0x6Cf1ed8721aB2B408d2a25797d6F71c9a17923A8) on 0G Explorer |
 
