@@ -420,6 +420,38 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       map.on('mouseenter', 'disaster-icons', () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', 'disaster-icons', () => { map.getCanvas().style.cursor = '' })
 
+      map.on('click', 'proof-markers', (e) => {
+        const feature = e.features?.[0]
+        if (!feature || !e.lngLat) return
+        const props = feature.properties as { agent: string; evidenceImage: string; evidenceType: string; verified: string; zone: string; credibility: number }
+        const agentName = props.agent?.replace('.responsesurface.eth', '') || 'unknown'
+        const isVerified = props.verified === 'yes'
+        const statusColor = isVerified ? '#22c55e' : '#ef4444'
+        const statusLabel = isVerified ? 'VERIFIED' : 'REJECTED'
+        const imgHtml = props.evidenceImage
+          ? `<img src="/images/evidence/${props.evidenceImage}" style="width:100%;height:100px;object-fit:cover;border-radius:4px 4px 0 0;${isVerified ? '' : 'filter:grayscale(0.5) brightness(0.7)'}" />`
+          : ''
+        new mapboxgl.Popup({ closeButton: false, maxWidth: '220px', offset: 10 })
+          .setLngLat(e.lngLat)
+          .setHTML(`
+            <div style="font-family:Inter,sans-serif;font-size:11px;color:#1e293b;background:#ffffff;border-radius:6px;border:1px solid ${statusColor}40;box-shadow:0 2px 8px rgba(0,0,0,0.15);overflow:hidden">
+              ${imgHtml}
+              <div style="padding:6px 10px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <img src="/images/agents/${agentName}.webp" style="width:16px;height:16px;border-radius:50%;border:1px solid ${statusColor}" onerror="this.style.display='none'" />
+                  <span style="font-weight:600">${agentName}</span>
+                  <span style="font-size:8px;padding:1px 4px;border-radius:2px;background:${statusColor}20;color:${statusColor};font-weight:600">${statusLabel}</span>
+                </div>
+                <div style="margin-top:3px;color:#64748b;font-size:10px">${props.evidenceType || 'Evidence'}</div>
+                <div style="margin-top:2px;color:#94a3b8;font-size:9px">${props.zone}</div>
+              </div>
+            </div>
+          `)
+          .addTo(map)
+      })
+      map.on('mouseenter', 'proof-markers', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'proof-markers', () => { map.getCanvas().style.cursor = '' })
+
       // === ANIMATION LOOP ===
       const animate = () => {
         const frame = ++frameRef.current
@@ -830,7 +862,15 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
       type: 'FeatureCollection',
       features: proofs.map(p => ({
         type: 'Feature' as const,
-        properties: { responder: p.responderEns, credibility: p.credibilityScore },
+        properties: {
+          responder: p.responderEns,
+          agent: p.agentEns,
+          credibility: p.credibilityScore,
+          evidenceImage: p.evidenceImage || '',
+          evidenceType: p.evidenceType || '',
+          verified: p.astralVerified ? 'yes' : 'no',
+          zone: p.containment?.zone || '',
+        },
         geometry: p.location,
       })),
     })

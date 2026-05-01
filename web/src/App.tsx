@@ -515,11 +515,11 @@ export default function App() {
               <div className="px-2 py-1.5">
                 <AllocationSummary allocations={allocations} cycleNumber={cycleNumber} />
                 {proofs.length > 0 && (
-                  <div className="mb-2 px-2 py-2 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
-                    <div className="flex items-center justify-between">
+                  <div className="mb-2 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)] overflow-hidden">
+                    <div className="flex items-center justify-between px-2 py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] uppercase tracking-wider font-medium text-[var(--color-text-placeholder)]">
-                          Proofs
+                          Ground Truth Proofs
                         </span>
                         <span className="text-[9px] font-[var(--font-mono)] tabular" style={{ color: 'var(--status-normal)' }}>
                           {proofs.filter(p => p.astralVerified).length} verified
@@ -537,8 +537,45 @@ export default function App() {
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.15)' }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.06)' }}
                       >
-                        View Details
+                        View All
                       </button>
+                    </div>
+                    {/* Evidence photo strip */}
+                    <div className="flex gap-1 px-2 pb-2 overflow-x-auto scrollbar-thin">
+                      {proofs.filter(p => p.evidenceImage).map((p, i) => {
+                        const agentName = p.agentEns.replace('.responsesurface.eth', '')
+                        const isRejected = !p.astralVerified
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setShowProofs(true)}
+                            className="relative shrink-0 w-[90px] h-[60px] rounded-[var(--radius)] overflow-hidden cursor-pointer group"
+                            style={{ border: `1px solid ${isRejected ? 'rgba(239,68,68,0.4)' : 'var(--border-default)'}` }}
+                          >
+                            <img
+                              src={`/images/evidence/${p.evidenceImage}`}
+                              alt={p.evidenceType || 'Evidence'}
+                              className="w-full h-full object-cover"
+                              style={isRejected ? { filter: 'grayscale(0.5) brightness(0.6)' } : undefined}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            {isRejected && (
+                              <div className="absolute top-1 right-1">
+                                <span className="text-[6px] px-1 py-px rounded bg-red-500/80 text-white font-bold uppercase">rejected</span>
+                              </div>
+                            )}
+                            <div className="absolute bottom-1 left-1 flex items-center gap-1">
+                              <img
+                                src={`/images/agents/${agentName}.webp`}
+                                alt=""
+                                className="w-3 h-3 rounded-full border border-white/40 object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                              />
+                              <span className="text-[7px] text-white font-medium">{agentName}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -798,29 +835,27 @@ function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
       {activities.map(event => {
         const cfg = TYPE_CONFIG[event.type]
         return (
-          <div key={event.id} className="flex items-start gap-2.5 px-2 py-1.5 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
-            <div className="shrink-0 flex items-center" style={{ height: '16px' }}>
-              <div className="w-[6px] h-[6px] rounded-full" style={{ background: cfg.dot }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] leading-4" style={{ color: cfg.text }}>
+          <div key={event.id} className="px-2 py-1.5 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="flex items-center gap-2.5">
+              <div className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: cfg.dot }} />
+              <span className="text-[10px] leading-4 flex-1 min-w-0" style={{ color: cfg.text }}>
                 {event.message}
               </span>
-              {event.links && event.links.length > 0 && (
-                <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-                  {event.links.map((link, j) => (
-                    <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
-                      className="text-[9px] font-[var(--font-mono)] hover:underline"
-                      style={{ color: 'var(--color-interactive)' }}>
-                      {link.label} ↗
-                    </a>
-                  ))}
-                </div>
-              )}
+              <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
+                {timeAgo(event.timestamp)}
+              </span>
             </div>
-            <span className="text-[9px] font-[var(--font-mono)] tabular shrink-0" style={{ color: 'var(--color-text-placeholder)' }}>
-              {timeAgo(event.timestamp)}
-            </span>
+            {event.links && event.links.length > 0 && (
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5 ml-[18px]">
+                {event.links.map((link, j) => (
+                  <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+                    className="text-[9px] font-[var(--font-mono)] hover:underline"
+                    style={{ color: 'var(--color-interactive)' }}>
+                    {link.label} ↗
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
