@@ -1,4 +1,4 @@
-# Response Surface
+# Disaster Response Allocator
 
 ![Response Surface Dashboard](docs/screenshot.png)
 

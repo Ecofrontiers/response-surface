@@ -798,8 +798,10 @@ function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
       {activities.map(event => {
         const cfg = TYPE_CONFIG[event.type]
         return (
-          <div key={event.id} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
-            <div className="w-[6px] h-[6px] rounded-full mt-[5px] shrink-0" style={{ background: cfg.dot }} />
+          <div key={event.id} className="flex items-start gap-2.5 px-2 py-1.5 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="shrink-0 flex items-center" style={{ height: '16px' }}>
+              <div className="w-[6px] h-[6px] rounded-full" style={{ background: cfg.dot }} />
+            </div>
             <div className="flex-1 min-w-0">
               <span className="text-[10px] leading-4" style={{ color: cfg.text }}>
                 {event.message}
