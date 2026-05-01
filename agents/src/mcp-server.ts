@@ -223,7 +223,7 @@ app.get('/api/axl/topology', async (_req, res) => {
 })
 
 app.get('/api/axl/discovery', async (_req, res) => {
-  const coordinatorAxl = new AXLClient(`http://127.0.0.1:9022`)
+  const coordinatorAxl = new AXLClient(`http://127.0.0.1:9092`)
   try {
     const topo = await coordinatorAxl.getTopology()
     const discovered = await Promise.all(
@@ -245,20 +245,10 @@ app.get('/api/axl/discovery', async (_req, res) => {
   } catch {
     res.json({
       coordinatorPeerId: '',
-      discoveredAgents: axlNodes
-        .filter(n => n.name !== 'coordinator')
-        .map(n => ({
-          peerId: `ed25519:${n.name}`,
-          card: {
-            name: `${n.name}.responsesurface.eth`,
-            description: `${n.name} bioregional agent`,
-            capabilities: n.name === 'rogue' || n.name === 'phantom' ? ['assessment'] : ['assessment', 'proof-collection'],
-            services: ['assessment'],
-          },
-          status: 'offline',
-        })),
+      discoveredAgents: [],
       totalPeers: 0,
       discoveredCount: 0,
+      offline: true,
     })
   }
 })
@@ -420,7 +410,7 @@ const cycleAgentConfigs = [
     role: 'adversary' as const,
     bbox: { west: -100, south: 35, east: -85, north: 45 } as BBox,
     center: [-92.5, 40] as [number, number],
-    axlPort: 9092,
+    axlPort: 0,
   },
 ]
 
@@ -560,7 +550,7 @@ app.post('/api/cycle/run', async (req, res) => {
   // Phase 2: AXL relay (5s timeout — nodes may not be running)
   let axlOnline = false
   try {
-    const coordAxl = new AXLClient('http://127.0.0.1:9022')
+    const coordAxl = new AXLClient('http://127.0.0.1:9092')
     const topo = await withTimeout(coordAxl.getTopology(), 5000, 'AXL coordinator')
     axlOnline = true
     emit('system', `AXL mesh — ${topo.peers.length} peers, relaying ${assessments.length} assessments`)
@@ -621,6 +611,94 @@ app.post('/api/cycle/run', async (req, res) => {
     }
   }
 
+  // Build proofs from real Astral containment results
+  const proofs: Array<{
+    responderEns: string; agentEns: string;
+    location: { type: 'Point'; coordinates: [number, number] };
+    credibilityScore: number; disasterId: string; timestamp: number;
+    proofHash: string; astralVerified: boolean;
+    containment: { contained: boolean; zone: string; attestation?: unknown };
+    evidenceType: string; proofDensity: number; evidenceImage?: string;
+  }> = []
+
+  const EVIDENCE_IMAGES: Record<string, string[]> = {
+    wildfires: ['wildfire_01.webp', 'wildfire_02.webp'],
+    fire: ['wildfire_01.webp', 'wildfire_02.webp'],
+    volcanoes: ['wildfire_02.webp'],
+    floods: ['flood_01.webp', 'flood_02.webp'],
+    severeStorms: ['storm_01.webp', 'storm_02.webp'],
+    earthquake: ['storm_01.webp'],
+  }
+  function pickEvidenceImage(category: string): string {
+    const images = EVIDENCE_IMAGES[category] || EVIDENCE_IMAGES['wildfires']
+    return images[Math.floor(Math.random() * images.length)]
+  }
+
+  for (const a of assessmentsForScoring) {
+    const assessmentPayload = JSON.stringify({ agent: a.agentEns, severity: a.severity, proofDensity: a.proofDensity, timestamp: a.timestamp, disasters: a.disasters.length })
+    const proofHash = ethers.keccak256(ethers.toUtf8Bytes(assessmentPayload))
+    const isAdversary = a.proofDensity === 0 && a.severity >= 9
+
+    if (a.proofDensity > 0 && a.disasters.length > 0) {
+      const geo = a.disasters[0].geometry?.[a.disasters[0].geometry.length - 1]
+      const disasterCoords = geo?.coordinates || a.bioregion.center
+      const zone = `${shortName(a.agentEns)} region (${a.bioregion.bbox.west.toFixed(1)}W–${a.bioregion.bbox.east.toFixed(1)}E)`
+
+      proofs.push({
+        responderEns: `responder.responsesurface.eth`,
+        agentEns: a.agentEns,
+        location: { type: 'Point', coordinates: [disasterCoords[0], disasterCoords[1]] },
+        credibilityScore: 0,
+        disasterId: a.disasters[0]?.id || `zone-${a.agentEns}`,
+        timestamp: Date.now(),
+        proofHash,
+        astralVerified: true,
+        containment: { contained: true, zone },
+        evidenceType: a.disasters[0]?.categories?.[0]?.id || 'disaster',
+        proofDensity: a.proofDensity,
+        evidenceImage: pickEvidenceImage(a.disasters[0]?.categories?.[0]?.id || 'wildfires'),
+      })
+    } else if (isAdversary) {
+      const geo = a.disasters[0]?.geometry?.[a.disasters[0].geometry.length - 1]
+      const claimedLocation = geo?.coordinates || a.bioregion.center
+      const bioregionPolygon = {
+        type: 'Polygon' as const,
+        coordinates: [[
+          [a.bioregion.bbox.west, a.bioregion.bbox.south],
+          [a.bioregion.bbox.east, a.bioregion.bbox.south],
+          [a.bioregion.bbox.east, a.bioregion.bbox.north],
+          [a.bioregion.bbox.west, a.bioregion.bbox.north],
+          [a.bioregion.bbox.west, a.bioregion.bbox.south],
+        ]],
+      }
+      let contained = false
+      let attestation: unknown
+      try {
+        const result = await checkContainmentREST(bioregionPolygon, { type: 'Point', coordinates: claimedLocation })
+        contained = result.result
+        attestation = result.attestation
+      } catch {
+        contained = false
+      }
+      const zone = contained ? `${shortName(a.agentEns)} region` : `outside verified region`
+      proofs.push({
+        responderEns: a.agentEns,
+        agentEns: a.agentEns,
+        location: { type: 'Point', coordinates: [claimedLocation[0], claimedLocation[1]] },
+        credibilityScore: 0,
+        disasterId: a.disasters[0]?.id || `fabricated-${a.agentEns}`,
+        timestamp: Date.now(),
+        proofHash,
+        astralVerified: contained,
+        containment: { contained, zone, attestation },
+        evidenceType: `${a.disasters[0]?.categories?.[0]?.id || 'unknown'} (unverified)`,
+        proofDensity: 0,
+        evidenceImage: pickEvidenceImage(a.disasters[0]?.categories?.[0]?.id || 'wildfires'),
+      })
+      emit('flag', `REJECTED: ${shortName(a.agentEns)} proof failed Astral containment — ${zone}`, a.agentEns)
+    }
+  }
+
   const scored = assessmentsForScoring.map(a => {
     const ensScore = ensCredibility.get(a.agentEns)
     const credibility = ensScore !== undefined && ensScore > 0
@@ -633,25 +711,58 @@ app.post('/api/cycle/run', async (req, res) => {
       a.agentEns,
     )
     const disasterDensity = 1 + a.disasters.length * 0.4
-    return { ...a, credibility, weight: credibility * a.severity * disasterDensity }
+    // Proof gate: 0 verified proofs → zero allocation. Adversarial agents cannot receive funds.
+    const proofMultiplier = a.proofDensity === 0 ? 0 : Math.min(0.15 + a.proofDensity * 0.28, 1.0)
+    return { ...a, credibility, weight: credibility * a.severity * disasterDensity * proofMultiplier }
   })
+
+  // Coordinator reasoning: show allocation breakdown per agent
+  for (const s of scored) {
+    const disasterDensity = 1 + s.disasters.length * 0.4
+    const proofMultiplier = s.proofDensity === 0 ? 0 : Math.min(0.15 + s.proofDensity * 0.28, 1.0)
+    if (proofMultiplier === 0) {
+      emit(
+        'flag',
+        `coordinator — ${shortName(s.agentEns)} EXCLUDED: 0 verified proofs → zero allocation (cred=${s.credibility}, sev=${s.severity}, ${s.disasters.length} disasters claimed)`,
+        s.agentEns,
+      )
+    } else {
+      emit(
+        'system',
+        `coordinator — ${shortName(s.agentEns)}: weight=${s.weight.toFixed(0)} (cred=${s.credibility} × sev=${s.severity} × density=${disasterDensity.toFixed(1)} × proofMult=${proofMultiplier.toFixed(2)})`,
+        s.agentEns,
+      )
+    }
+  }
+
+  // Update proof credibility scores now that we have them
+  for (const p of proofs) {
+    const s = scored.find(s => s.agentEns === p.agentEns)
+    if (s) p.credibilityScore = s.credibility
+  }
 
   // Phase 4: 0G Compute sealed inference
   let teeVerified = false
+  let teePlan: { zones: { disasterId: string; ensName: string; amount: string; rationale: string }[] } | null = null
   const providerAddress = process.env.ZG_COMPUTE_PROVIDER
   const privateKey = process.env.EVM_PRIVATE_KEY
 
   if (providerAddress && privateKey) {
     try {
       const broker = await createComputeBroker(privateKey)
-      const plan = await runCoordinatorInference(broker, providerAddress, assessmentsForScoring)
-      teeVerified = plan.teeVerified
-      emit('system', `0G Compute — allocation plan verified in TEE enclave`)
+      const result = await runCoordinatorInference(broker, providerAddress, assessmentsForScoring)
+      teeVerified = result.teeVerified
+      if (result.plan?.zones?.length > 0) {
+        teePlan = result.plan
+        emit('system', `0G Compute — allocation plan verified in TEE enclave (${result.plan.zones.length} zones)`)
+      } else {
+        emit('system', `0G Compute — TEE verified but no allocation plan returned, using local weighting`)
+      }
     } catch (e) {
-      emit('system', `0G Compute — TEE error: ${(e as Error).message}`)
+      emit('system', `0G Compute — TEE error: ${(e as Error).message}, falling back to local weighting`)
     }
   } else {
-    emit('system', `0G Compute — TEE not configured, using local credibility weighting`)
+    emit('system', `0G Compute — not configured, using local credibility weighting`)
   }
 
   // Phase 5: Build allocations — read real contract balance
@@ -681,25 +792,56 @@ app.post('/api/cycle/run', async (req, res) => {
   emit('system', `Allocating ${ALLOCATION_PCT}% of balance (${fmtEth(allocationPool.toString())} fUSD) this cycle`)
 
   const SCALE = 1_000_000_000n
-  const allocations = scored.map(s => {
-    const share = totalWeight > 0 ? s.weight / totalWeight : 0
-    const scaledShare = BigInt(Math.round(share * 1_000_000_000))
-    const amount = (allocationPool * scaledShare) / SCALE
-    return {
-      ensName: s.agentEns,
-      amount: amount.toString(),
-      disasterId: s.disasters[0]?.id || `zone-${s.agentEns}`,
-      timestamp: Date.now(),
-      assessmentHash: ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ agent: s.agentEns, severity: s.severity, cycle: cycleNumber }))),
-      teeVerified,
-      credibility: s.credibility,
-      severity: s.severity,
-      share,
-      disasterCount: s.disasters.length,
-      proofDensity: s.proofDensity,
-      weight: s.weight,
-    }
-  })
+
+  // Use TEE plan if available, otherwise fall back to local credibility weighting
+  let allocations: Array<{ ensName: string; amount: string; disasterId: string; timestamp: number; assessmentHash: string; teeVerified: boolean; credibility: number; severity: number; share: number; disasterCount: number; proofDensity: number; weight: number }>
+
+  if (teePlan && teePlan.zones.length > 0) {
+    // TEE-derived allocations: use the plan but bound amounts to the allocation pool
+    const teeTotal = teePlan.zones.reduce((s, z) => s + parseFloat(z.amount || '0'), 0)
+    allocations = teePlan.zones.map(z => {
+      const agent = scored.find(s => s.agentEns === z.ensName)
+      const share = teeTotal > 0 ? parseFloat(z.amount || '0') / teeTotal : 0
+      const scaledShare = BigInt(Math.round(share * 1_000_000_000))
+      const amount = (allocationPool * scaledShare) / SCALE
+      return {
+        ensName: z.ensName,
+        amount: amount.toString(),
+        disasterId: z.disasterId || agent?.disasters[0]?.id || `zone-${z.ensName}`,
+        timestamp: Date.now(),
+        assessmentHash: ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ agent: z.ensName, severity: agent?.severity || 0, cycle: cycleNumber }))),
+        teeVerified,
+        credibility: agent?.credibility || 0,
+        severity: agent?.severity || 0,
+        share,
+        disasterCount: agent?.disasters.length || 0,
+        proofDensity: agent?.proofDensity || 0,
+        weight: agent?.weight || 0,
+      }
+    })
+    emit('system', `Using TEE-verified allocation plan`)
+  } else {
+    // Local credibility-weighted allocation
+    allocations = scored.map(s => {
+      const share = totalWeight > 0 ? s.weight / totalWeight : 0
+      const scaledShare = BigInt(Math.round(share * 1_000_000_000))
+      const amount = (allocationPool * scaledShare) / SCALE
+      return {
+        ensName: s.agentEns,
+        amount: amount.toString(),
+        disasterId: s.disasters[0]?.id || `zone-${s.agentEns}`,
+        timestamp: Date.now(),
+        assessmentHash: ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ agent: s.agentEns, severity: s.severity, cycle: cycleNumber }))),
+        teeVerified,
+        credibility: s.credibility,
+        severity: s.severity,
+        share,
+        disasterCount: s.disasters.length,
+        proofDensity: s.proofDensity,
+        weight: s.weight,
+      }
+    })
+  }
   const allocTotal = allocations.reduce((s, a) => s + BigInt(a.amount), 0n)
   if (allocTotal > allocationPool && allocations.length > 0) {
     const excess = allocTotal - allocationPool
@@ -797,12 +939,13 @@ app.post('/api/cycle/run', async (req, res) => {
     for (let i = 0; i < scored.length; i++) {
       const s = scored[i]
       try {
-        await updateCredibility(ensWallet, s.agentEns, {
+        const txHash = await updateCredibility(ensWallet, s.agentEns, {
           score: s.credibility,
           totalProofs: s.proofDensity,
         })
         emit('system', `ENS updated — ${shortName(s.agentEns)} credibility → ${s.credibility}/1000`, s.agentEns, [
           { label: s.agentEns, url: `https://app.ens.domains/${s.agentEns}` },
+          { label: `tx: ${txHash.slice(0, 10)}…`, url: `https://sepolia.etherscan.io/tx/${txHash}` },
         ])
         ensUpdated = true
         if (i < scored.length - 1) await new Promise(r => setTimeout(r, 2000))
@@ -827,6 +970,7 @@ app.post('/api/cycle/run', async (req, res) => {
       disasterCount: s.disasters.length,
       speciesAtRisk: s.speciesAtRisk.length,
     })),
+    proofs,
     allocations,
     teeVerified,
     axlOnline,

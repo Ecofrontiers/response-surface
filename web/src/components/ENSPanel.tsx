@@ -142,7 +142,7 @@ export default function ENSPanel({ agents, onClose }: ENSPanelProps) {
             <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">ENSIP-25 Agent Registration</h3>
             <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/[0.03]">
               <div className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed">
-                Each agent registers via ERC-8004 Identity contract on Sepolia (<code className="text-[10px] bg-[var(--color-base)] px-1 rounded">0x8004...BD9e</code>). The registration links the ENS subname to a structured agent card following ENSIP-25, enabling automated discovery by any A2A-compatible coordinator.
+                Each agent registers as an ENS subname under responsesurface.eth with structured text records following ENSIP-25 (role, bounds, data sources, credibility). The coordinator discovers agents by querying ENS text records — no separate registry contract needed.
               </div>
             </div>
           </div>

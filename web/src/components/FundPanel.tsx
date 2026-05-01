@@ -86,30 +86,8 @@ function AllocationBar({ allocations }: { allocations: Allocation[] }) {
 }
 
 export default function FundPanel({ balance, totalAllocated, allocations }: FundPanelProps) {
-  const total = balance + totalAllocated
-  const pct = total > 0n ? Number((totalAllocated * 100n) / total) : 0
-
   return (
     <div>
-      {/* Hero number — light weight, large */}
-      <div className="text-[28px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
-        {formatEth(balance)}
-      </div>
-      <div className="text-[10px] text-[var(--color-text-placeholder)] uppercase tracking-widest mt-1">fUSD available</div>
-
-      {/* Allocation bar */}
-      <div className="flex items-center gap-2 mt-3">
-        <div className="flex-1 h-[3px] bg-[var(--border-default)] rounded-[1px] overflow-hidden">
-          <div
-            className="h-full rounded-[1px] transition-all duration-700"
-            style={{ width: `${pct}%`, background: 'var(--status-serious)' }}
-          />
-        </div>
-        <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">
-          {formatEth(totalAllocated)} out
-        </span>
-      </div>
-
       {allocations.length > 0 && <AllocationBar allocations={allocations} />}
     </div>
   )

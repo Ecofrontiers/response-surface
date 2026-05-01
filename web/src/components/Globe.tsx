@@ -1048,54 +1048,64 @@ export default function Globe({ agents, disasters, allocations, proofs, onAgentC
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
-      {/* Map legend */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-sm border border-black/10 rounded-xl px-4 py-3 text-[10px] space-y-1.5 shadow-lg">
-        <div className="text-[9px] text-gray-500 uppercase tracking-wider font-medium mb-2">Map Key</div>
-        <div className="flex items-center gap-2">
-          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
-            <polygon points="10,3 17.7,13 2.3,13" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
-          </svg>
-          <span className="text-gray-600">Wildfire / volcano — EONET</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
-            <polygon points="10,3 17.7,13 2.3,13" fill="#ff6b35" stroke="white" strokeWidth="1.5"/>
-          </svg>
-          <span className="text-gray-600">Fire hotspot — NASA FIRMS</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
-            <polygon points="10,3 16,10 10,17 4,10" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
-          </svg>
-          <span className="text-gray-600">Flood / storm — EONET</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
-            <polygon points="10,3 16,10 10,17 4,10" fill="#f59e0b" stroke="white" strokeWidth="1.5"/>
-          </svg>
-          <span className="text-gray-600">Earthquake — USGS</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#22c55e]" style={{ background: 'linear-gradient(135deg, #f97316, #3b82f6)' }} />
-          <span className="text-gray-600">Agent — avatar photo, ring = credibility</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#ef4444]" style={{ background: '#ef444440', animation: 'pulse-ring 1.5s ease-in-out infinite' }} />
-          <span className="text-gray-600">Flagged adversarial agent</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
-          <span className="text-gray-600">Monitoring region</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-[2px] shrink-0" style={{ background: '#a78bfa' }} />
-          <span className="text-gray-600">AXL mesh relay</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-[2px] shrink-0" style={{ background: '#4ade80' }} />
-          <span className="text-gray-600">Fund allocation flow</span>
-        </div>
-      </div>
+      <MapLegend />
     </>
+  )
+}
+
+function MapLegend() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-sm border border-black/10 rounded-xl text-[10px] shadow-lg" style={{ minWidth: open ? '200px' : undefined }}>
+      <button
+        className="flex items-center gap-2 px-3 py-2 cursor-pointer w-full"
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className="text-[9px] text-gray-500 uppercase tracking-wider font-medium">Map Key</span>
+        <span className="text-[8px] text-gray-400 ml-auto">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
+              <polygon points="10,3 17.7,13 2.3,13" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
+            </svg>
+            <span className="text-gray-600">Fire / volcano — EONET + FIRMS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
+              <polygon points="10,3 16,10 10,17 4,10" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
+            </svg>
+            <span className="text-gray-600">Flood / storm — EONET</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg width="12" height="12" viewBox="0 0 20 20" className="shrink-0">
+              <polygon points="10,3 16,10 10,17 4,10" fill="#f59e0b" stroke="white" strokeWidth="1.5"/>
+            </svg>
+            <span className="text-gray-600">Earthquake — USGS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#22c55e]" style={{ background: 'linear-gradient(135deg, #f97316, #3b82f6)' }} />
+            <span className="text-gray-600">Agent — ring = credibility</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-[14px] h-[14px] rounded-full shrink-0 border-2 border-[#ef4444]" style={{ background: '#ef444440', animation: 'pulse-ring 1.5s ease-in-out infinite' }} />
+            <span className="text-gray-600">Adversarial agent</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-2.5 rounded-sm shrink-0" style={{ background: 'rgba(249,115,22,0.1)', border: '1px dashed rgba(249,115,22,0.4)' }} />
+            <span className="text-gray-600">Monitoring region</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-[2px] shrink-0" style={{ background: '#a78bfa' }} />
+            <span className="text-gray-600">AXL mesh relay</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-[2px] shrink-0" style={{ background: '#4ade80' }} />
+            <span className="text-gray-600">Fund flow</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

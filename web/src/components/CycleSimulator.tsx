@@ -16,15 +16,18 @@ interface CycleSimulatorProps {
   onProofs?: (proofs: Proof[]) => void
 }
 
-const EVIDENCE_MAP: Record<string, { file: string; type: string; coords: [number, number]; zone: string }> = {
-  'pacific.responsesurface.eth': { file: 'wildfire_01.webp', type: 'Wildfire', coords: [-121.3, 39.8], zone: 'California foothills' },
-  'mountain.responsesurface.eth': { file: 'wildfire_02.webp', type: 'Wildfire', coords: [-110.5, 44.2], zone: 'Yellowstone perimeter' },
-  'central.responsesurface.eth': { file: 'storm_01.webp', type: 'Storm damage', coords: [-97.4, 38.5], zone: 'Kansas tornado corridor' },
-  'lakes.responsesurface.eth': { file: 'flood_01.webp', type: 'Flood', coords: [-87.6, 42.1], zone: 'Lake Michigan shore' },
-  'delta.responsesurface.eth': { file: 'flood_02.webp', type: 'Flood', coords: [-90.2, 32.4], zone: 'Mississippi basin' },
-  'gulf.responsesurface.eth': { file: 'wildfire_01.webp', type: 'Wildfire', coords: [-97.8, 31.5], zone: 'Texas brush country' },
-  'atlantic.responsesurface.eth': { file: 'storm_02.webp', type: 'Storm', coords: [-76.3, 36.8], zone: 'Carolina coast' },
-  'northeast.responsesurface.eth': { file: 'storm_01.webp', type: 'Storm', coords: [-72.1, 43.2], zone: 'Vermont highlands' },
+interface BackendProof {
+  responderEns: string
+  agentEns: string
+  location: { type: 'Point'; coordinates: [number, number] }
+  credibilityScore: number
+  disasterId: string
+  timestamp: number
+  proofHash: string
+  astralVerified: boolean
+  containment: { contained: boolean; zone: string; attestation?: unknown }
+  evidenceType: string
+  proofDensity: number
 }
 
 interface BackendEvent {
@@ -39,6 +42,7 @@ interface CycleResult {
   cycleNumber: number
   events: BackendEvent[]
   assessments: { agentEns: string; severity: number; proofDensity: number; credibility: number; disasterCount: number; speciesAtRisk: number }[]
+  proofs?: BackendProof[]
   allocations: { ensName: string; amount: string; disasterId: string; timestamp: number; assessmentHash: string; teeVerified: boolean; credibility: number; share: number; disasterCount?: number; proofDensity?: number; weight?: number; severity?: number }[]
   teeVerified: boolean
   axlOnline: boolean
@@ -181,58 +185,20 @@ export default function CycleSimulator({
       await playBackEvents(result.events, allocShares)
       for (const a of result.assessments) onAgentUpdate(a.agentEns, { credibilityScore: a.credibility })
 
-      const newProofs: Proof[] = []
-      for (const a of result.assessments) {
-        if (a.proofDensity > 0) {
-          const evidence = EVIDENCE_MAP[a.agentEns]
-          if (evidence) {
-            newProofs.push({
-              responderEns: `responder.responsesurface.eth`,
-              agentEns: a.agentEns,
-              location: { type: 'Point', coordinates: evidence.coords },
-              credibilityScore: a.credibility,
-              disasterId: `cycle-${cycleNumber}`,
-              timestamp: Date.now(),
-              proofHash: `0x${crypto.randomUUID().replace(/-/g, '')}`,
-              astralVerified: true,
-              containment: { contained: true, zone: evidence.zone },
-              evidenceImage: evidence.file,
-              evidenceType: evidence.type,
-              proofDensity: a.proofDensity,
-            })
-          }
-        }
-      }
-
-      // Adversarial agents ATTEMPT proofs that fail Astral verification
-      const ADVERSARIAL_ATTEMPTS: Record<string, { file: string; type: string; coords: [number, number]; zone: string; reason: string }> = {
-        'rogue.responsesurface.eth': { file: 'wildfire_02.webp', type: 'Fabricated wildfire', coords: [-150.0, 61.2], zone: 'Alaska (outside claimed region)', reason: 'Location 2,400km from nearest reported disaster' },
-        'phantom.responsesurface.eth': { file: 'flood_01.webp', type: 'Fabricated flood', coords: [-92.5, 40.0], zone: 'Iowa (no active flood)', reason: 'No corroborating data from USGS or EONET' },
-      }
-      for (const a of result.assessments) {
-        const attempt = ADVERSARIAL_ATTEMPTS[a.agentEns]
-        if (attempt) {
-          newProofs.push({
-            responderEns: a.agentEns,
-            agentEns: a.agentEns,
-            location: { type: 'Point', coordinates: attempt.coords },
-            credibilityScore: a.credibility,
-            disasterId: `cycle-${cycleNumber}`,
-            timestamp: Date.now(),
-            proofHash: `0x${crypto.randomUUID().replace(/-/g, '')}`,
-            astralVerified: false,
-            containment: { contained: false, zone: attempt.zone },
-            evidenceImage: attempt.file,
-            evidenceType: attempt.type,
-            proofDensity: 0,
-          })
-          onActivity({
-            type: 'flag',
-            agent: a.agentEns.replace('.responsesurface.eth', ''),
-            message: `REJECTED: ${a.agentEns.split('.')[0]} submitted proof from ${attempt.zone} — ${attempt.reason}`,
-          })
-        }
-      }
+      // Use proofs from backend (real Astral containment, real SHA-256 hashes)
+      const newProofs: Proof[] = (result.proofs || []).map(p => ({
+        responderEns: p.responderEns,
+        agentEns: p.agentEns,
+        location: p.location,
+        credibilityScore: p.credibilityScore,
+        disasterId: p.disasterId,
+        timestamp: p.timestamp,
+        proofHash: p.proofHash,
+        astralVerified: p.astralVerified,
+        containment: p.containment,
+        evidenceType: p.evidenceType,
+        proofDensity: p.proofDensity,
+      }))
 
       if (newProofs.length > 0) onProofs?.(newProofs)
 

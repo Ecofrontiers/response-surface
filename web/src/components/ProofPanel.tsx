@@ -18,6 +18,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 function proofMultiplier(density: number): number {
+  if (density === 0) return 0
   return Math.min(0.15 + density * 0.28, 1.0)
 }
 
@@ -111,8 +112,8 @@ export default function ProofPanel({ proofs, onClose }: ProofPanelProps) {
                   <div className="mt-3 px-3 py-2 rounded-[var(--radius)] bg-[var(--color-header)] border border-[var(--border-default)]">
                     <div className="text-[10px] text-[var(--color-text-placeholder)] leading-relaxed">
                       <span className="text-red-400 font-medium">Defense mechanism:</span> Astral verified that submitted coordinates fall outside any active disaster zone.
-                      Without verified proofs, the credibility multiplier stays at 15% &mdash; even inflated severity scores cannot bypass the gate.
-                      These agents received <span className="text-red-400 font-[var(--font-mono)]">~1%</span> of funds vs <span className="text-emerald-400 font-[var(--font-mono)]">~14%</span> for verified agents.
+                      Without verified proofs, agents are <span className="text-red-400 font-medium">EXCLUDED</span> from allocation entirely &mdash; even inflated severity scores cannot bypass the gate.
+                      These agents received <span className="text-red-400 font-[var(--font-mono)]">0%</span> of funds vs <span className="text-emerald-400 font-[var(--font-mono)]">~14%</span> for verified agents.
                     </div>
                   </div>
                 </div>
@@ -156,10 +157,10 @@ export default function ProofPanel({ proofs, onClose }: ProofPanelProps) {
                 Each agent&apos;s fund allocation is weighted by a proof multiplier derived from Astral-verified evidence:
               </div>
               <div className="font-[var(--font-mono)] text-xs text-emerald-400 bg-[var(--color-base)] rounded-[var(--radius)] px-3 py-2">
-                proofMultiplier = min(0.15 + verifiedProofs &times; 0.28, 1.0)
+                proofMultiplier = proofs == 0 ? 0 : min(0.15 + verifiedProofs &times; 0.28, 1.0)
               </div>
               <div className="flex gap-4 text-[10px]">
-                <div><span className="text-red-400 font-[var(--font-mono)]">0 proofs</span> <span className="text-[var(--color-text-placeholder)]">= 15% allocation</span></div>
+                <div><span className="text-red-400 font-[var(--font-mono)]">0 proofs</span> <span className="text-[var(--color-text-placeholder)]">= EXCLUDED (0%)</span></div>
                 <div><span className="text-amber-400 font-[var(--font-mono)]">1 proof</span> <span className="text-[var(--color-text-placeholder)]">= 43% allocation</span></div>
                 <div><span className="text-emerald-400 font-[var(--font-mono)]">3+ proofs</span> <span className="text-[var(--color-text-placeholder)]">= 99% allocation</span></div>
               </div>

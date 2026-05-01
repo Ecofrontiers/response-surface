@@ -6,7 +6,6 @@ import CycleSimulator from './components/CycleSimulator'
 import DocsPanel from './components/DocsPanel'
 import MeshPanel from './components/MeshPanel'
 import ProofPanel from './components/ProofPanel'
-import ENSPanel from './components/ENSPanel'
 import type { Agent, Disaster, Allocation, Proof, CycleMapState, AgentMessage } from './types'
 
 const FALLBACK_AGENTS: Agent[] = [
@@ -119,11 +118,12 @@ export default function App() {
   const [showDocs, setShowDocs] = useState(false)
   const [showMesh, setShowMesh] = useState(false)
   const [showProofs, setShowProofs] = useState(false)
-  const [showENS, setShowENS] = useState(false)
   const [axlNodes, setAxlNodes] = useState(0)
   const [cycleMapState, setCycleMapState] = useState<CycleMapState>({ phase: 'idle', allocationShares: {} })
   const [messages, setMessages] = useState<AgentMessage[]>([])
-  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'feed' | 'comms'>('dashboard')
+  const [sidebarTab, setSidebarTab] = useState<'dashboard' | 'feed' | 'mesh' | 'ens'>('dashboard')
+  const [agentsCollapsed, setAgentsCollapsed] = useState(false)
+  const [fundCollapsed, setFundCollapsed] = useState(false)
 
   const addMessage = useCallback((msg: AgentMessage) => {
     setMessages(prev => {
@@ -277,10 +277,6 @@ export default function App() {
     <div className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-base)]">
       <Header
         onDocsClick={() => setShowDocs(true)}
-        onENSClick={() => setShowENS(true)}
-        onProofsClick={() => setShowProofs(true)}
-        agentCount={agents.length}
-        proofCount={proofs.length}
         axlNodes={axlNodes}
       />
 
@@ -311,7 +307,8 @@ export default function App() {
             {([
               { key: 'dashboard' as const, label: 'Dashboard' },
               { key: 'feed' as const, label: `Feed (${activities.length})` },
-              { key: 'comms' as const, label: `Comms (${messages.length})` },
+              { key: 'mesh' as const, label: `AXL Mesh (${axlNodes})` },
+              { key: 'ens' as const, label: 'ENS Registry' },
             ]).map(tab => (
               <button
                 key={tab.key}
@@ -329,11 +326,11 @@ export default function App() {
 
           {/* Tab content — full scroll area */}
           <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-            {sidebarTab === 'dashboard' && (
+            <div style={{ display: sidebarTab === 'dashboard' ? 'block' : 'none' }}>
               <>
-                <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} />
+                <SectionBand label="Agents" right={`${visibleAgents.filter(a => a.status === 'active').length} monitoring`} collapsed={agentsCollapsed} onClick={() => setAgentsCollapsed(c => !c)} />
 
-                <div className="px-2 py-1.5 space-y-px">
+                <div className="px-2 py-1.5 space-y-px" style={{ display: agentsCollapsed ? 'none' : undefined }}>
                   {visibleAgents.map(agent => {
                     const name = agent.ensName.replace('.responsesurface.eth', '')
                     const color = AGENT_COLORS[name] || 'var(--status-off)'
@@ -455,9 +452,9 @@ export default function App() {
                   })}
                 </div>
 
-                <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} />
+                <SectionBand label="Response Fund" right={`Cycle ${cycleNumber}`} collapsed={fundCollapsed} onClick={() => setFundCollapsed(c => !c)} />
 
-                <div className="px-4 py-3">
+                <div className="px-4 py-3" style={{ display: fundCollapsed ? 'none' : undefined }}>
                   <div className="flex items-baseline justify-between">
                     <div>
                       <span className="text-[22px] font-light text-[var(--color-text)] font-[var(--font-mono)] tabular leading-none">
@@ -505,40 +502,61 @@ export default function App() {
                   )}
                 </div>
               </>
-            )}
+            </div>
 
-            {sidebarTab === 'feed' && (
+            <div style={{ display: sidebarTab === 'feed' ? 'block' : 'none' }}>
               <div className="px-2 py-1.5">
+                <AllocationSummary allocations={allocations} cycleNumber={cycleNumber} />
+                {proofs.length > 0 && (
+                  <div className="mb-2 px-2 py-2 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] uppercase tracking-wider font-medium text-[var(--color-text-placeholder)]">
+                          Proofs
+                        </span>
+                        <span className="text-[9px] font-[var(--font-mono)] tabular" style={{ color: 'var(--status-normal)' }}>
+                          {proofs.filter(p => p.astralVerified).length} verified
+                        </span>
+                        {proofs.some(p => !p.astralVerified) && (
+                          <span className="text-[9px] font-[var(--font-mono)] tabular" style={{ color: 'var(--status-critical)' }}>
+                            {proofs.filter(p => !p.astralVerified).length} rejected
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setShowProofs(true)}
+                        className="text-[9px] font-[var(--font-mono)] px-2 py-0.5 rounded-[var(--radius)] cursor-pointer transition-all border"
+                        style={{ color: 'var(--color-interactive)', borderColor: 'var(--color-interactive-muted)', background: 'rgba(59,130,246,0.06)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.15)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.06)' }}
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <ActivityFeed activities={activities} />
               </div>
-            )}
+            </div>
 
-            {sidebarTab === 'comms' && (
+            <div style={{ display: sidebarTab === 'mesh' ? 'block' : 'none' }}>
               <div>
-                <div className="px-3 py-2 bg-[var(--color-header)] border-b border-[var(--border-default)]">
-                  <div className="flex items-center gap-2">
+                {/* Clickable topology mini-view */}
+                <button
+                  onClick={() => setShowMesh(true)}
+                  className="w-full px-3 py-3 bg-[var(--color-header)] border-b border-[var(--border-default)] cursor-pointer hover:bg-[var(--color-hover)] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2 mb-2">
                     <div className={`w-[6px] h-[6px] rounded-full ${axlNodes > 0 ? 'bg-emerald-400 status-glow-normal' : 'bg-[var(--status-off)]'}`} />
-                    <span className="text-[10px] text-[var(--color-text-placeholder)]">
+                    <span className="text-[10px] font-medium text-[var(--color-text-secondary)]">
                       {axlNodes > 0
-                        ? `AXL Mesh — ${axlNodes} nodes, Ed25519 P2P`
+                        ? `${axlNodes} AXL Nodes Online`
                         : 'AXL Mesh — connecting...'}
                     </span>
-                    <button
-                      onClick={() => setShowMesh(true)}
-                      className="ml-auto text-[9px] font-[var(--font-mono)] px-2 py-0.5 rounded-[var(--radius)] cursor-pointer transition-all border"
-                      style={{
-                        color: '#8b5cf6',
-                        borderColor: 'rgba(139,92,246,0.3)',
-                        background: 'rgba(139,92,246,0.06)',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.15)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.06)' }}
-                    >
-                      Mesh Topology
-                    </button>
+                    <span className="ml-auto text-[9px] text-[var(--color-interactive)] font-[var(--font-mono)]">
+                      View Topology →
+                    </span>
                   </div>
-                </div>
-                <div className="px-3 py-2 border-b border-[var(--border-default)]">
                   <div className="grid grid-cols-5 gap-x-3 gap-y-1">
                     {['coordinator', 'pacific', 'mountain', 'central', 'lakes', 'delta', 'gulf', 'atlantic', 'northeast', 'rogue'].map(name => {
                       const isAdversary = name === 'rogue' || name === 'phantom'
@@ -546,25 +564,137 @@ export default function App() {
                       return (
                         <div key={name} className="flex items-center gap-1.5">
                           <div
-                            className={`w-[5px] h-[5px] rounded-full ${axlNodes > 0 ? '' : ''}`}
+                            className="w-[5px] h-[5px] rounded-full"
                             style={{ background: axlNodes > 0 ? nodeColor : 'var(--status-off)' }}
                           />
                           <span className={`text-[8px] truncate ${isAdversary ? 'text-red-400/60' : 'text-[var(--color-text-placeholder)]'}`}>
                             {name}
                           </span>
-                          <span className="text-[7px] font-[var(--font-mono)] text-[var(--color-text-placeholder)] ml-auto">
-                            {axlNodes > 0 ? '18p' : '—'}
-                          </span>
                         </div>
                       )
                     })}
                   </div>
-                </div>
+                  <div className="mt-2 text-[9px] text-[var(--color-text-placeholder)] leading-relaxed">
+                    Ed25519-authenticated P2P mesh — assessments are cryptographically signed and relayed between agents without a central server.
+                  </div>
+                </button>
                 <div className="px-2 py-1.5">
                   <CommsFeed messages={messages} />
                 </div>
               </div>
-            )}
+            </div>
+
+            <div style={{ display: sidebarTab === 'ens' ? 'block' : 'none' }}>
+              <div>
+                {/* ENSIP-25 note */}
+                <div className="px-3 py-2">
+                  <div className="p-2 rounded-[var(--radius)] border border-purple-500/20 bg-purple-500/[0.03]">
+                    <div className="text-[10px] text-[var(--color-text-placeholder)] leading-relaxed">
+                      <span className="text-purple-400 font-medium">ENSIP-25:</span> Agents register as subnames with structured text records (role, bounds, data sources, credibility). The coordinator discovers agents by querying ENS — no separate registry contract needed.
+                    </div>
+                  </div>
+                  <div className="mt-1.5 p-2 rounded-[var(--radius)] bg-[var(--color-base)] border border-[var(--border-default)]">
+                    <div className="text-[9px] text-[var(--color-text-placeholder)] leading-relaxed">
+                      <span className="text-cyan-400">Note:</span> The ENS app may show &quot;0 Records&quot; because it doesn&apos;t enumerate custom text record keys. Verify by querying the Public Resolver directly with <code className="bg-[var(--color-header)] px-1 rounded">text(namehash, key)</code>.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identity gate + credibility + cross-chain explainer at top */}
+                <div className="px-3 py-3 bg-[var(--color-header)] border-b border-[var(--border-default)]">
+                  <div className="text-[11px] text-[var(--color-text-secondary)] leading-relaxed space-y-2">
+                    <div>
+                      <span className="text-cyan-400 font-medium">Identity gate:</span> Before accepting an assessment, the coordinator reads the agent&apos;s ENS subname. No registered subname under <code className="text-[9px] bg-[var(--color-base)] px-1 rounded">responsesurface.eth</code> = no allocation.
+                    </div>
+                    <div>
+                      <span className="text-cyan-400 font-medium">Credibility onchain:</span> After each cycle, <code className="text-[9px] bg-[var(--color-base)] px-1 rounded">credibility.score</code> and <code className="text-[9px] bg-[var(--color-base)] px-1 rounded">credibility.proofs</code> are written as text records on Sepolia. Agents with 0 verified proofs are excluded from allocation entirely — they receive nothing.
+                    </div>
+                    <div>
+                      <span className="text-cyan-400 font-medium">Cross-chain:</span> <code className="text-[9px] bg-[var(--color-base)] px-1 rounded">0g.address</code> maps the Sepolia ENS identity to the agent&apos;s 0G Chain wallet for fund disbursement.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text record schema */}
+                <div className="px-3 py-2">
+                  <div className="text-[9px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-1.5 font-medium">Text Record Schema</div>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { key: 'role', color: '#06b6d4' },
+                      { key: 'description', color: '#06b6d4' },
+                      { key: 'bioregion.bounds', color: '#22c55e' },
+                      { key: 'data.sources', color: '#8b5cf6' },
+                      { key: 'axl.pubkey', color: '#8b5cf6' },
+                      { key: '0g.address', color: '#f59e0b' },
+                      { key: 'credibility.score', color: '#22c55e' },
+                      { key: 'credibility.proofs', color: '#22c55e' },
+                    ].map(r => (
+                      <span key={r.key} className="text-[8px] font-[var(--font-mono)] px-1.5 py-0.5 rounded-[var(--radius)] border" style={{ borderColor: `${r.color}25`, color: r.color, background: `${r.color}06` }}>
+                        {r.key}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <SectionBand label="Registered Agents" right={`${agents.length} on Sepolia`} />
+                <div className="px-2 py-1.5 space-y-1">
+                  {agents.map(agent => {
+                    const name = agent.ensName.replace('.responsesurface.eth', '')
+                    const color = AGENT_COLORS[name] || 'var(--status-off)'
+                    const cred = agent.credibilityScore ?? 0
+                    const isFlagged = agent.status === 'flagged'
+                    return (
+                      <div key={agent.ensName} className="px-2.5 py-2 rounded-[var(--radius)] border bg-[var(--color-header)]" style={{ borderColor: isFlagged ? 'rgba(255,56,56,0.2)' : `${color}20` }}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-[6px] h-[6px] rounded-full" style={{ background: color }} />
+                          <span className="text-[11px] font-medium text-[var(--color-text)]">{name}</span>
+                          <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
+                            {agent.role}
+                          </span>
+                          {isFlagged && (
+                            <span className="text-[8px] px-1 py-px rounded-[2px] uppercase tracking-wider font-medium" style={{ color: 'var(--status-critical)', background: 'rgba(255,56,56,0.15)' }}>flagged</span>
+                          )}
+                          <div className="ml-auto text-right">
+                            <span className="text-[12px] font-medium font-[var(--font-mono)] tabular" style={{ color: credColor(cred) }}>
+                              {cred === 0 ? '—' : cred}
+                            </span>
+                            <span className="text-[8px] text-[var(--color-text-placeholder)] ml-0.5">/1000</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 mt-1.5">
+                          {[
+                            { label: 'bioregion.bounds', value: `${agent.bioregion.bbox.west.toFixed(0)},${agent.bioregion.bbox.south.toFixed(0)},${agent.bioregion.bbox.east.toFixed(0)},${agent.bioregion.bbox.north.toFixed(0)}` },
+                            { label: 'data.sources', value: agent.dataSources.join(',') },
+                          ].map(rec => (
+                            <span key={rec.label} className="text-[8px] font-[var(--font-mono)] px-1 py-px rounded-[2px] bg-[var(--color-base)] text-[var(--color-text-placeholder)]">
+                              {rec.label}={rec.value.length > 20 ? `${rec.value.slice(0, 18)}…` : rec.value}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <a href={`https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5#readContract`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="text-[8px] font-[var(--font-mono)] hover:underline" style={{ color: 'var(--color-interactive)' }}>
+                            Resolver ↗
+                          </a>
+                          <a href={`https://app.ens.domains/${agent.ensName}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="text-[8px] font-[var(--font-mono)] hover:underline" style={{ color: '#06b6d4' }}>
+                            ENS ↗
+                          </a>
+                          {agent.axlPubkey && (
+                            <span className="text-[8px] font-[var(--font-mono)] text-[var(--color-text-placeholder)] truncate max-w-[120px]">
+                              axl:{agent.axlPubkey.slice(0, 12)}…
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+              </div>
+            </div>
           </div>
         </aside>
       </div>
@@ -572,7 +702,6 @@ export default function App() {
       {/* Modal panels */}
       {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
       {showMesh && <MeshPanel messages={messages} onClose={() => setShowMesh(false)} />}
-      {showENS && <ENSPanel agents={agents} onClose={() => setShowENS(false)} />}
       {showProofs && (
         <ProofPanel
           proofs={proofs}
@@ -583,11 +712,19 @@ export default function App() {
   )
 }
 
-function SectionBand({ label, right }: { label: string; right?: string }) {
+function SectionBand({ label, right, collapsed, onClick }: { label: string; right?: string; collapsed?: boolean; onClick?: () => void }) {
   return (
-    <div className="px-4 py-1.5 bg-[var(--color-header)] flex items-center justify-between border-y border-[var(--border-default)]">
+    <div
+      className={`px-4 py-1.5 bg-[var(--color-header)] flex items-center justify-between border-y border-[var(--border-default)]${onClick ? ' cursor-pointer hover:bg-[var(--color-hover)] transition-colors' : ''}`}
+      onClick={onClick}
+    >
       <span className="text-[10px] font-medium text-[var(--color-text-placeholder)] uppercase tracking-wider">{label}</span>
-      {right && <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">{right}</span>}
+      <div className="flex items-center gap-1.5">
+        {collapsed !== undefined && (
+          <span className="text-[10px] text-[var(--color-text-placeholder)]">{collapsed ? '▸' : '▾'}</span>
+        )}
+        {right && <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)] tabular">{right}</span>}
+      </div>
     </div>
   )
 }
@@ -596,6 +733,52 @@ const MSG_COLORS: Record<string, string> = {
   pacific: '#f97316', mountain: '#ef4444', central: '#f59e0b', lakes: '#3b82f6',
   delta: '#06b6d4', gulf: '#8b5cf6', atlantic: '#10b981', northeast: '#6366f1',
   coordinator: '#ffb302', rogue: '#ff3838', phantom: '#ff3838',
+}
+
+function AllocationSummary({ allocations, cycleNumber }: { allocations: Allocation[]; cycleNumber: number }) {
+  if (allocations.length === 0) return null
+  const total = allocations.reduce((s, a) => s + a.amount, 0n)
+  const sorted = [...allocations].sort((a, b) => Number(b.amount - a.amount))
+  const formatAmt = (wei: bigint) => (Number(wei) / 1e18).toFixed(1)
+  return (
+    <div className="mb-2 px-2 py-2 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] uppercase tracking-wider font-medium text-[var(--color-text-placeholder)]">
+          Cycle {cycleNumber > 1 ? cycleNumber - 1 : 1} Allocation
+        </span>
+        <span className="text-[10px] font-[var(--font-mono)] tabular text-[var(--color-text-secondary)]">
+          {formatAmt(total)} fUSD
+        </span>
+      </div>
+      <div className="flex h-[6px] rounded-[2px] overflow-hidden gap-px">
+        {sorted.map(a => {
+          const name = a.ensName.replace('.responsesurface.eth', '')
+          const pct = total > 0n ? Number(a.amount) * 100 / Number(total) : 0
+          return (
+            <div
+              key={a.ensName}
+              title={`${name}: ${pct.toFixed(1)}%`}
+              style={{ width: `${pct}%`, background: AGENT_COLORS[name] || '#6b7280', minWidth: pct > 0 ? '2px' : '0' }}
+            />
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+        {sorted.slice(0, 6).map(a => {
+          const name = a.ensName.replace('.responsesurface.eth', '')
+          const pct = total > 0n ? Number(a.amount) * 100 / Number(total) : 0
+          return (
+            <span key={a.ensName} className="text-[8px] font-[var(--font-mono)] tabular" style={{ color: AGENT_COLORS[name] || '#6b7280' }}>
+              {name} {pct.toFixed(0)}%
+            </span>
+          )
+        })}
+        {sorted.length > 6 && (
+          <span className="text-[8px] text-[var(--color-text-placeholder)]">+{sorted.length - 6} more</span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
@@ -608,10 +791,10 @@ function ActivityFeed({ activities }: { activities: ActivityEvent[] }) {
       {activities.map(event => {
         const cfg = TYPE_CONFIG[event.type]
         return (
-          <div key={event.id} className="flex gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
-            <div className="w-[6px] h-[6px] rounded-full shrink-0 mt-[5px]" style={{ background: cfg.dot }} />
+          <div key={event.id} className="flex items-start gap-2 px-2 py-1 rounded-[var(--radius)] hover:bg-[var(--color-hover)] transition-colors">
+            <div className="w-[6px] h-[6px] rounded-full mt-[5px] shrink-0" style={{ background: cfg.dot }} />
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] leading-relaxed" style={{ color: cfg.text }}>
+              <span className="text-[10px] leading-4" style={{ color: cfg.text }}>
                 {event.message}
               </span>
               {event.links && event.links.length > 0 && (

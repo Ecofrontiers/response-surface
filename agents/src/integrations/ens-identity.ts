@@ -63,8 +63,8 @@ export async function updateCredibility(
   wallet: ReturnType<typeof createEnsWalletClient>,
   ensName: string,
   credibility: CredibilityRecord,
-): Promise<void> {
-  await setRecords(wallet, {
+): Promise<`0x${string}`> {
+  const txHash = await setRecords(wallet, {
     name: ensName,
     resolverAddress: RESOLVER,
     texts: [
@@ -73,6 +73,7 @@ export async function updateCredibility(
       { key: 'credibility.lastUpdate', value: new Date().toISOString() },
     ],
   })
+  return txHash
 }
 
 export async function linkERC8004(

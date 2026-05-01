@@ -1,17 +1,19 @@
 # Response Surface
 
+![Response Surface Dashboard](docs/screenshot.png)
+
 Disaster response where every decision is verifiable.
 
-Bioregional AI agents monitor real government data sources, relay assessments through an encrypted P2P mesh, and a coordinator allocates emergency funds weighted by onchain credibility scores. An adversarial agent proves the system works — inflated claims with zero proofs get crushed by the credibility gate.
+Regional AI agents monitor real government data sources, relay assessments through an encrypted P2P mesh, and a coordinator allocates emergency funds weighted by onchain credibility scores. Adversarial agents prove the system works — inflated claims with zero proofs are excluded entirely by the credibility gate.
 
 ## How It Works
 
 Eleven agents run an allocation cycle every round — 8 regional monitors covering the contiguous US, a coordinator, and 2 adversarial agents that stress-test the credibility gate:
 
-1. **Detection** — Regional agents (`pacific`, `mountain`, `central`, `lakes`, `delta`, `gulf`, `atlantic`, `northeast`) each monitor their bioregion via NASA EONET, FIRMS, USGS, GBIF, AirNow, and iNaturalist. Adversarial agents (`rogue`, `phantom`) submit inflated severity with zero verified proofs.
+1. **Detection** — Regional agents (`pacific`, `mountain`, `central`, `lakes`, `delta`, `gulf`, `atlantic`, `northeast`) each monitor their region via NASA EONET, FIRMS, USGS, GBIF, AirNow, and iNaturalist. Adversarial agents (`rogue`, `phantom`) submit inflated severity with zero verified proofs.
 2. **Mesh** — Assessments relay through a Gensyn AXL P2P mesh with Ed25519 authentication. Each message is signed and verified.
-3. **Identity** — The coordinator reads ENS text records on Sepolia to gate participation. Credibility scores, proof counts, bioregion bounds, and AXL public keys are all stored as ENS text records under `responsesurface.eth`.
-4. **Compute** — Credibility-weighted allocation using the formula `proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)`. With 0G Compute TEE configured, inference runs in a sealed enclave.
+3. **Identity** — The coordinator reads ENS text records on Sepolia to gate participation. Credibility scores, proof counts, region bounds, and AXL public keys are all stored as ENS text records under `responsesurface.eth`.
+4. **Compute** — Credibility-weighted allocation using `proofMultiplier = proofs == 0 ? 0 : min(0.15 + proofCount × 0.28, 1.0)`. Agents with zero verified proofs are excluded entirely. With 0G Compute TEE configured, inference runs in a sealed enclave.
 5. **Funds** — fUSD allocations execute on 0G Chain via the ResponseFund contract, weighted by `credibility × severity`.
 6. **Audit** — The full cycle (assessments, scores, allocations) is uploaded as an immutable audit log to 0G Storage with a Merkle root.
 7. **Update** — New credibility scores are written back to ENS text records, feeding the next cycle.
@@ -19,16 +21,10 @@ Eleven agents run an allocation cycle every round — 8 regional monitors coveri
 ### Adversarial Defense
 
 ```
-proofMultiplier = min(0.15 + proofCount × 0.28, 1.0)
+proofMultiplier = proofs == 0 ? 0 : min(0.15 + proofCount × 0.28, 1.0)
 ```
 
-Real allocation from a live cycle with 10 agents assessed:
-- High-credibility regional agents (lakes, delta, gulf, atlantic, central, mountain) — ~13.6% each
-- `northeast.responsesurface.eth` — 8.7%, `pacific.responsesurface.eth` — 7.2%
-- `rogue.responsesurface.eth` — 1.2% (severity 9, crushed by credibility gate)
-- `phantom.responsesurface.eth` — 1.2% (same pattern)
-
-Scores accumulate across rounds via ENS text records. History cannot be faked.
+Agents with zero verified Astral proofs receive **zero allocation** — the gate is data-driven, not hardcoded. Any agent (not just named adversaries) that fails to produce verified location proofs gets excluded. Scores accumulate across rounds via ENS text records. History cannot be faked.
 
 ## Architecture
 
@@ -55,8 +51,8 @@ iNaturalist ─┘  ENS Sepolia ────────────────
 ## Quick Start
 
 ```bash
-git clone https://github.com/Ecofrontiers/bioregional-agents.git
-cd bioregional-agents
+git clone https://github.com/Ecofrontiers/regional-agents.git
+cd regional-agents
 cp .env.example .env        # fill in API keys (see below)
 npm install
 npm run dev:web             # frontend on http://localhost:5174
@@ -91,13 +87,17 @@ Everything is real and verifiable:
 ```
 contracts/   Solidity on 0G Chain (evmVersion: cancun, 0.8.24+)
 agents/      Node.js backend — MCP server, coordinator, government API integrations
-web/         React + Mapbox globe with real bioregion boundaries
+web/         React + Mapbox globe with real region boundaries
 axl/         Gensyn AXL node configurations (4 nodes)
 ```
 
 ## Built With
 
 0G (Chain, Compute, Storage), Gensyn AXL, ENS (ensjs, ENSIP-25), Astral SDK, NASA EONET, NASA FIRMS, USGS Water Services, GBIF, EPA AirNow, iNaturalist, Mapbox GL JS, React, Vite, ethers.js, viem
+
+## AI Disclosure
+
+Built with assistance from Claude (Anthropic). Claude was used for code generation, architecture design, and documentation throughout the development process.
 
 ## License
 

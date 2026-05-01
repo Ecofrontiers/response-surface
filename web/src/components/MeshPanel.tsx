@@ -207,21 +207,36 @@ export default function MeshPanel({ messages, onClose }: MeshPanelProps) {
             </div>
           </div>
 
+          <div className="p-3 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--color-header)]">
+            <p className="text-[10px] text-[var(--color-text-secondary)] leading-relaxed">
+              In disaster response, communication infrastructure is often the first thing to fail. AXL provides a decentralized P2P mesh where each agent node can relay assessments directly to peers without relying on a central server. If one relay path goes down, assessments route through other peers. Each message is cryptographically signed — the coordinator can verify exactly which agent sent each assessment.
+            </p>
+          </div>
+
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-3">A2A Discovery</h3>
+            <h3 className="text-[10px] uppercase tracking-wider text-[var(--color-text-placeholder)] mb-2">A2A Discovery</h3>
+            <p className="text-[10px] text-[var(--color-text-placeholder)] mb-3">
+              Agents communicate via AXL's P2P mesh. Each node is identified by its Ed25519 public key.
+            </p>
             <div className="space-y-2">
-              {discovered.map((d, i) => (
+              {discovered.map((d, i) => {
+                const matchedNode = nodes.find(n => n.peerId === d.peerId)
+                const agentName = matchedNode?.name || d.card?.name || 'Unknown'
+                const isConnected = matchedNode?.online ?? false
+                const displayStatus = isConnected ? 'connected' : d.status === 'discovered' ? 'discovered' : d.status
+                const color = matchedNode ? (NODE_COLORS[matchedNode.name] || '#6b7280') : '#6b7280'
+                return (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border-default)] bg-[var(--color-header)]">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 ${d.status === 'discovered' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  <div className={`w-2 h-2 rounded-full mt-1.5 ${isConnected || d.status === 'discovered' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-[var(--color-text)]">{d.card?.name || 'Unknown'}</span>
+                      <span className="text-xs font-medium" style={{ color }}>{agentName}</span>
                       <span className="text-[10px] text-[var(--color-text-placeholder)] font-[var(--font-mono)]">{d.peerId.slice(0, 20)}...</span>
                       <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded ${
-                        d.status === 'discovered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        isConnected || d.status === 'discovered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : 'bg-red-500/10 text-red-400 border border-red-500/20'
                       }`}>
-                        {d.status}
+                        {displayStatus}
                       </span>
                     </div>
                     {d.card && (
@@ -246,7 +261,8 @@ export default function MeshPanel({ messages, onClose }: MeshPanelProps) {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
               {discovered.length === 0 && !loading && (
                 <div className="text-[10px] text-[var(--color-text-placeholder)] text-center py-4">
                   No peers discovered — AXL mesh offline
