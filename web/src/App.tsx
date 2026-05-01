@@ -322,6 +322,13 @@ export default function App() {
                 {tab.label}
               </button>
             ))}
+            <button
+              className="flex-1 px-3 py-2 text-[10px] uppercase tracking-wider font-semibold cursor-pointer border-b-2 border-transparent transition-colors text-emerald-400 hover:text-emerald-300 hover:border-emerald-400/50"
+              style={{ background: 'linear-gradient(to top, rgba(16,185,129,0.06), transparent)' }}
+              onClick={() => setShowDocs(true)}
+            >
+              Docs
+            </button>
           </div>
 
           {/* Tab content — full scroll area */}
