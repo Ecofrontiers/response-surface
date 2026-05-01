@@ -4,7 +4,7 @@
 
 What if disaster response ran on a dynamic allocation surface instead of static emergency procurement? Agents watch real government feeds, collect location proofs from the ground, and route funds to where the data says they're needed — not where someone claims they're needed.
 
-**[Live App](https://responsesurface.vercel.app)** | **[Presentation Deck](docs/submission/deck.html)**
+**[Live App](https://responsesurface.vercel.app)** | **[Presentation Deck](https://responsesurface.vercel.app/deck.html)**
 
 ## How It Works
 
